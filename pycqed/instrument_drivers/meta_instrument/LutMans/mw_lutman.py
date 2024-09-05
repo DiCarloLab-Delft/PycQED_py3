@@ -1125,8 +1125,11 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
 
     def upload_single_qubit_phase_corrections(self):
         commandtable_dict = {
-            "$schema": "http://docs.zhinst.com/hdawg/commandtable/v2/schema",
-            "header": {"version": "0.2"},
+            "$schema": "https://json-schema.org/draft-07/schema#",
+            "title": "AWG Command Table Schema",
+            "description": "Schema for ZI HDAWG AWG Command Table",
+            "version": "1.2.0",
+            "header": {"version": "1.2.0"},
             "table": []
         }
 

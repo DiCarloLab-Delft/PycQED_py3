@@ -218,7 +218,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIO.CalInterface):
 
         self.add_parameter(
             'cfg_codeword_protocol', initial_value='identical',
-            vals=validators.Enum('identical', 'microwave', 'novsm_microwave', 'flux'), docstring=(
+            vals=validators.Enum('identical', 'microwave', 'novsm_microwave', 'flux', "calibration"), docstring=(
                 'Used in the configure codeword method to determine what DIO'
                 ' pins are used in for which AWG numbers.'),
             parameter_class=ManualParameter)
@@ -330,6 +330,7 @@ while (1) {
         """
         if isinstance(commandtable, dict):
             commandtable = json.dumps(commandtable, sort_keys=True, indent=2)
+
         # validate json (without schema)
         try:
             json.loads(commandtable)
@@ -566,7 +567,7 @@ while (1) {
 
         return False
 
-    def _find_valid_delays(self, awgs_and_sequences):
+    def _find_valid_delays(self, awgs_and_sequences, dio_mask):
         """Finds valid DIO delay settings for a given AWG by testing all allowed delay settings for timing violations on the
         configured bits. In addition, it compares the recorded DIO codewords to an expected sequence to make sure that no
         codewords are sampled incorrectly."""
@@ -574,11 +575,13 @@ while (1) {
         valid_delays= []
         for delay in range(16):
             log.debug(f'   Testing delay {delay}')
-            self.setd('raw/dios/0/delays/*/value', delay)
-            time.sleep(1)
+            for index in range(32):
+                self.setd(f'raw/dios/*/delays/{index}/value', delay)
+            self.seti('raw/dios/*/error/timingclear', 1)
+            time.sleep(3)
             valid_sequence = True
             for awg, sequence in awgs_and_sequences:
-                if self.geti('awgs/' + str(awg) + '/dio/error/timing') == 0:
+                if self.geti('raw/dios/0/error/timingsticky') == 0:
                     ts, cws = self._get_awg_dio_data(awg)
                     index = None
                     last_index = None
@@ -604,7 +607,6 @@ while (1) {
 
             if valid_sequence:
                 valid_delays.append(delay)
-
         return set(valid_delays)
 
     ##########################################################################
@@ -639,14 +641,17 @@ while (1) {
 
     def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
         # FIXME: UHF driver does not use expected_sequence, why the difference
+
         self.assure_ext_clock()
         self.upload_codeword_program()
 
         for awg, sequence in expected_sequence:
             if not self._ensure_activity(awg, mask_value=dio_mask):
                 raise ziDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
-
-        valid_delays = self._find_valid_delays(expected_sequence)
+        # self.setd('awgs/*/dio/mask/shift', 0)
+        # self.setd('awgs/0/dio/mask/value', 0)
+        valid_delays = self._find_valid_delays(expected_sequence, dio_mask)
+        print(valid_delays)
         if len(valid_delays) == 0:
             raise ziDIOCalibrationError('DIO calibration failed! No valid delays found')
 
