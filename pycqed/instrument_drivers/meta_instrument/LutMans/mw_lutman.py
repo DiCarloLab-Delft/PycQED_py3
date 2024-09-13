@@ -1124,6 +1124,34 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
     ##########################################################################
 
     def upload_single_qubit_phase_corrections(self):
+        """
+        Upon upgrading LabOne version and the HDAWG firmware, one may get command table version
+        errors. To fix them, it helps to run the following script,
+
+        --------------------------------------------------------------------
+
+        import json
+        import zhinst.ziPython as zi
+
+        dev = "dev8473" # Update with available HDAWG device ID
+        dataserver = "127.0.0.1"  # Update with dataserver IP
+
+        daq = zi.ziDAQServer(host=dataserver, port=8004, api_level=6)
+        interface   = '1GbE'
+        daq.connectDevice(dev, interface)
+
+        schema_node_path = f"/{dev}/awgs/0/commandtable/schema"
+        schema = daq.get(schema_node_path, flat=True)[schema_node_path][0]['vector']
+        print(json.dumps(json.loads(str(schema)), indent = 2))
+
+        --------------------------------------------------------------------
+
+        and from the output, copy the new "$schema" and "version" to the 'commandtable_dict' below.
+
+
+        """
+
+
         commandtable_dict = {
             "$schema": "https://json-schema.org/draft-07/schema#",
             "title": "AWG Command Table Schema",

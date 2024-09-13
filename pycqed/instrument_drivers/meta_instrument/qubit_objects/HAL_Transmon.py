@@ -3620,7 +3620,8 @@ class HAL_Transmon(HAL_ShimSQ):
     def measure_depletion_allxy(self, MC=None,
                                 analyze=True, close_fig=True,
                                 prepare_for_timedomain=True,
-                                label=''):
+                                label='',
+                                disable_metadata=False):
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
@@ -3631,9 +3632,10 @@ class HAL_Transmon(HAL_ShimSQ):
                              CCL=self.instr_CC.get_instr())
         d = self.int_avg_det
         MC.set_sweep_function(s)
-        MC.set_sweep_points(np.arange(21*2*3))
+        MC.set_sweep_points(np.arange(21*2*6))
         MC.set_detector_function(d)
-        MC.run('Depletion_AllXY'+self.msmt_suffix+label)
+        MC.run('Depletion_AllXY'+self.msmt_suffix+label,
+               disable_snapshot_metadata=disable_metadata)
         ma2.mra.Depletion_AllXY_analysis(self.name, label='Depletion')
 
     def measure_allxy(
