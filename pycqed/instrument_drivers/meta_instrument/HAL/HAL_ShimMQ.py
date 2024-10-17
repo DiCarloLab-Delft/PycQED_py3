@@ -8,6 +8,7 @@ Note:   a lot code was moved around within this file in December 2021. As a cons
 
 import logging
 import warnings
+import itertools
 from collections import OrderedDict
 import numpy as np
 from deprecated import deprecated
@@ -215,7 +216,7 @@ class HAL_ShimMQ(Instrument):
             self,
             qubits: list,
             reduced: bool = False,
-            bypass_flux: bool = True,
+            bypass_flux: bool = False,
             prepare_for_readout: bool = True
     ):
         """
@@ -229,8 +230,10 @@ class HAL_ShimMQ(Instrument):
             self.prepare_readout(qubits=qubits, reduced=reduced)
         if reduced:
             return
+
         if bypass_flux is False:
             self.prepare_fluxing(qubits=qubits)
+
         self.prepare_timing()
 
         for qb_name in qubits:
@@ -241,6 +244,7 @@ class HAL_ShimMQ(Instrument):
 
         # self._prep_td_configure_VSM()
 
+    # FIXME: setup dependent
     def prepare_for_inspire(self):
 
         # LDC. Trying to ensure readout is digitized, uses optimal weights, and does single shots w/o averaging
@@ -277,6 +281,8 @@ class HAL_ShimMQ(Instrument):
         
         name = 'System_snapshot'
         MC._set_measurement_name(name)
+        # FIXME: Replace absolute data directory path
+        # MC.datadir('D:\Experiments\Demonstrator_Execute_Data\Data')
         ######################
         with measurement_control.h5d.Data(
             name=MC._get_measurement_name(), datadir=MC.datadir()
@@ -565,6 +571,14 @@ class HAL_ShimMQ(Instrument):
             )
 
     def _add_ro_parameters(self):
+        # FIXME: no longer used, now in UHFQC_RO_LutMan.LO_freq
+        # self.add_parameter(
+        #     'ro_lo_freq',
+        #     unit='Hz',
+        #     docstring='Frequency of the common LO for all RO pulses.',
+        #     parameter_class=ManualParameter
+        # )
+
         # actually, it should be possible to build the integration
         # weights obeying different settings for different
         # qubits, but for now we use a fixed common value.
@@ -723,6 +737,20 @@ class HAL_ShimMQ(Instrument):
     ##########################################################################
     # private functions: prepare
     ##########################################################################
+
+    # FIXME: unused
+    # def _grab_instruments_from_qb(self):
+    #     """
+    #     initialize instruments that should only exist once from the first
+    #     qubit. Maybe must be done in a more elegant way (at least check
+    #     uniqueness).
+    #     """
+    #
+    #     qb = self.find_instrument(self.qubits()[0])
+    #     self.instr_MC(qb.instr_MC())
+    #     self.instr_VSM(qb.instr_VSM())
+    #     self.instr_CC(qb.instr_CC())
+    #     self.cfg_openql_platform_fn(qb.cfg_openql_platform_fn())
 
     def _prep_ro_sources(self, qubits):
         """
@@ -950,22 +978,33 @@ class HAL_ShimMQ(Instrument):
             ro_lm.set("M_down_length1_R{}".format(res_nr), qb.ro_pulse_down_length1())
             ro_lm.set("M_down_amp1_R{}".format(res_nr), qb.ro_pulse_down_amp1())
             ro_lm.set("M_down_phi1_R{}".format(res_nr), qb.ro_pulse_down_phi1())
+            # Addede by LDC on 2022/09/16
+            # ro_lm.set("M_final_length_R{}".format(res_nr), qb.ro_pulse_final_length())
+            # ro_lm.set("M_final_amp_R{}".format(res_nr), qb.ro_pulse_final_amp())
+            # ro_lm.set("M_final_delay_R{}".format(res_nr), qb.ro_pulse_final_delay())
+
 
         for ro_lm in ro_lms:
-            # list comprehension should result in a list with each
-            # individual resonator + the combination of all simultaneously
+            # list comprehension should result in a list with each individual resonator + the combination of all simultaneously
             # resonator_combs = [[r] for r in resonators_in_lm[ro_lm.name]] + \
             #     [resonators_in_lm[ro_lm.name]]
-            resonator_combs = [resonators_in_lm[ro_lm.name]]
-            log.info('Setting resonator combinations for {} to {}'.format(
-                ro_lm.name, resonator_combs))
+
+            # list comprehension should result in a list with the combination of all simultaneously
+            # resonator_combs = [resonators_in_lm[ro_lm.name]]
+            # log.info('Setting resonator combinations for {} to {}'.format(
+            #     ro_lm.name, resonator_combs))
+
+            # should result in a list with all the possible combinations of resonators
+            resonator_combs = []
+            for L in range(1, len(resonators_in_lm[ro_lm.name])+1):
+                for subset in itertools.combinations(resonators_in_lm[ro_lm.name],L):
+                    resonator_combs.append(list(subset))
 
             # FIXME: temporary fix so device object doesnt mess with
             #       the resonator combinations. Better strategy should be implemented
-            ro_lm.resonator_combinations(resonator_combs)
+            # ro_lm.resonator_combinations(resonator_combs)
             ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
 
-    # FIXME: unused
     def _prep_ro_instantiate_detectors(self):
         """
         Instantiate acquisition detectors.

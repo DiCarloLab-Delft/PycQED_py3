@@ -18,7 +18,8 @@
 				},
 				"zi-hdawg": {
 					"channels": 8,
-					"control_group_sizes": [1, 2, 4, 8] // NB: size=1 needs special treatment of waveforms because one AWG unit drives 2 channels
+					"control_group_sizes": [1, 2, 4, 8], // NB: size=1 needs special treatment of waveforms because one AWG unit drives 2 channels
+                    "latency": 300		// FIXME: check. If latency depends on FW version, several definitions must be present
 				},
 				"qutech-vsm": {
 					"channels": 32,
@@ -26,7 +27,8 @@
 				},
 				"zi-uhfqa": {
 					"channels": 9,
-					"control_group_sizes": [1]
+					"control_group_sizes": [1],
+                    "latency": 150		// FIXME: check. FIXME: specify latency if trigger to output, also measurement latency
 				}
 			},   // instrument_definitions
 
@@ -594,35 +596,6 @@
         // - https://github.com/QE-Lab/OpenQL/issues/224
         // - https://github.com/QE-Lab/OpenQL/pull/238
 
-		"park_cz" : { // park signal with same length as cz gate
-			"duration" : @FLUX_DURATION@,
-			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-			"cc_light_instr": "park_cz",
-			"type": "measure",		// FIXME
-			"cc": {
-				"signal": [
-					{	"type": "flux",
-						"operand_idx": 0,
-						"value": ["park_cz-{qubit}"]
-					}
-				],
-                "static_codeword_override": [0]   // FIXME
-			}
-		},
-
-		"park_measure" : { // park signal with same length as measurement
-			"duration" : @RO_DURATION@,
-			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-			"cc": {
-				"signal": [
-					{	"type": "flux",
-						"operand_idx": 0,
-						"value": ["park_measure-{qubit}"]
-					}
-				],
-                "static_codeword_override": [0]   // FIXME
-			}
-		},
 
 
 		// based on PyqQED_py3 'generate_CCL_cfg.py':
