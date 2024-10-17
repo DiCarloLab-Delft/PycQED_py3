@@ -639,6 +639,27 @@ class HAL_ShimMQ(Instrument):
             vals=vals.Bool(),
         )
 
+        # ADDED BY RDC 22-03-2023
+        self.add_parameter(
+            "hidden_init",
+            docstring="If true, it does postselection using the hidden initialization "
+                      "in execution.py.",
+            parameter_class=ManualParameter,
+            vals=vals.Bool(),
+            initial_value = True,
+        )
+
+        # ADDED BY RDC 04-04-2023
+        self.add_parameter(
+            "disable_metadata_online",
+            docstring="If true, it does NOT save metadata for quantum inspire" 
+                      "shots when the system is online"
+                      "in execution.py.",
+            parameter_class=ManualParameter,
+            vals=vals.Bool(),
+            initial_value = False,
+        )
+
     def _add_parameters(self):
         self._add_instr_parameters()
         self._add_tim_parameters()

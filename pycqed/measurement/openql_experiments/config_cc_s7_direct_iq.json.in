@@ -204,10 +204,10 @@
 
 
 
-// extracted from PyqQED_py3 'generate_CCL_cfg.py'
+    // extracted from PyqQED_py3 'generate_CCL_cfg.py'
   	"gate_decomposition": {
         // necessary to support measure_z cQASM operation, using measure operation
-        "measure_all": ["measure q0", "measure q1", "measure q2", "measure q3", "measure q4"],
+        "measure_all": ["measure q0", "measure q1", "measure q2", "measure q3", "measure q4", "measure q5", "measure q6"],
         "measure_z %0": ["i %0", "measure %0","i %0"],  // added pre and post identities. LDC 22/10/13.
         "measure_y %0": ["rx90 %0", "measure %0", "rx270 %0"], // modified by LDC, 22/10/13 to add post-rotation.
         "measure_x %0": ["ry270 %0", "measure %0", "ry90 %0"], // same.
@@ -253,6 +253,86 @@
 
         "cz q4, q6": ["barrier q4,q6", "sf_cz_sw q4", "sf_cz_ne q6", "barrier q4,q6", "phase_corr_sw q4", "phase_corr_ne q6", "barrier q4,q6"],
         "cz q6, q4": ["barrier q4,q6", "sf_cz_sw q4", "sf_cz_ne q6", "barrier q4,q6", "phase_corr_sw q4", "phase_corr_ne q6", "barrier q4,q6"],
+
+
+        // To support other forms of writing the same gates
+    	"x90 %0": ["rx90 %0"],
+    	"y90 %0": ["ry90 %0"],
+        "x180 %0": ["rx180 %0"],
+        "y180 %0": ["ry180 %0"],
+      	"xm90 %0": ["rx270 %0"],
+        "mx90 %0": ["rx270 %0"],
+        "ym90 %0": ["ry270 %0"],
+        "my90 %0": ["ry270 %0"],
+        "rxm90 %0": ["rx270 %0"],
+        "rym90 %0": ["ry270 %0"],
+        "rxm45 %0": ["rx315 %0"],
+        "rym45 %0": ["ry315 %0"],
+
+        // Zero and 360 rotations are all identity
+        "rx0 %0": ["i %0"],
+        "ry0 %0": ["i %0"],
+        "rz0 %0": ["i %0"],
+        "rx360 %0": ["i %0"],
+        "ry360 %0": ["i %0"],
+        "rz360 %0": ["i %0"],
+
+        // Forced to specify explicit target decomposition for RZ rotations
+        "rz6 %0":   ["ry90 %0", "rx6   %0", "ry270 %0"],
+        "rz13 %0":  ["ry90 %0", "rx13  %0", "ry270 %0"],
+        "rz19 %0":  ["ry90 %0", "rx19  %0", "ry270 %0"],
+        "rz26 %0":  ["ry90 %0", "rx26  %0", "ry270 %0"],
+        "rz32 %0":  ["ry90 %0", "rx32  %0", "ry270 %0"],
+        "rz39 %0":  ["ry90 %0", "rx39  %0", "ry270 %0"],
+        "rz45 %0":  ["ry90 %0", "rx45  %0", "ry270 %0"],
+        "rz51 %0":  ["ry90 %0", "rx51  %0", "ry270 %0"],
+        "rz58 %0":  ["ry90 %0", "rx58  %0", "ry270 %0"],
+        "rz64 %0":  ["ry90 %0", "rx64  %0", "ry270 %0"],
+        "rz71 %0":  ["ry90 %0", "rx71  %0", "ry270 %0"],
+        "rz77 %0":  ["ry90 %0", "rx77  %0", "ry270 %0"],
+        "rz84 %0":  ["ry90 %0", "rx84  %0", "ry270 %0"],
+        "rz90 %0":  ["ry90 %0", "rx90  %0", "ry270 %0"],
+        "rz96 %0":  ["ry90 %0", "rx96  %0", "ry270 %0"],
+        "rz103 %0": ["ry90 %0", "rx103 %0", "ry270 %0"],
+        "rz109 %0": ["ry90 %0", "rx109 %0", "ry270 %0"],
+        "rz116 %0": ["ry90 %0", "rx116 %0", "ry270 %0"],
+        "rz122 %0": ["ry90 %0", "rx122 %0", "ry270 %0"],
+        "rz129 %0": ["ry90 %0", "rx129 %0", "ry270 %0"],
+        "rz135 %0": ["ry90 %0", "rx135 %0", "ry270 %0"],
+        "rz141 %0": ["ry90 %0", "rx141 %0", "ry270 %0"],
+        "rz148 %0": ["ry90 %0", "rx148 %0", "ry270 %0"],
+        "rz154 %0": ["ry90 %0", "rx154 %0", "ry270 %0"],
+        "rz161 %0": ["ry90 %0", "rx161 %0", "ry270 %0"],
+        "rz167 %0": ["ry90 %0", "rx167 %0", "ry270 %0"],
+        "rz174 %0": ["ry90 %0", "rx174 %0", "ry270 %0"],
+        "rz180 %0": ["ry90 %0", "rx180 %0", "ry270 %0"],
+        "rz186 %0": ["ry90 %0", "rx186 %0", "ry270 %0"],
+        "rz193 %0": ["ry90 %0", "rx193 %0", "ry270 %0"],
+        "rz199 %0": ["ry90 %0", "rx199 %0", "ry270 %0"],
+        "rz206 %0": ["ry90 %0", "rx206 %0", "ry270 %0"],
+        "rz212 %0": ["ry90 %0", "rx212 %0", "ry270 %0"],
+        "rz219 %0": ["ry90 %0", "rx219 %0", "ry270 %0"],
+        "rz225 %0": ["ry90 %0", "rx225 %0", "ry270 %0"],
+        "rz231 %0": ["ry90 %0", "rx231 %0", "ry270 %0"],
+        "rz238 %0": ["ry90 %0", "rx238 %0", "ry270 %0"],
+        "rz244 %0": ["ry90 %0", "rx244 %0", "ry270 %0"],
+        "rz251 %0": ["ry90 %0", "rx251 %0", "ry270 %0"],
+        "rz257 %0": ["ry90 %0", "rx257 %0", "ry270 %0"],
+        "rz264 %0": ["ry90 %0", "rx264 %0", "ry270 %0"],
+        "rz270 %0": ["ry90 %0", "rx270 %0", "ry270 %0"],
+        "rz276 %0": ["ry90 %0", "rx276 %0", "ry270 %0"],
+        "rz283 %0": ["ry90 %0", "rx283 %0", "ry270 %0"],
+        "rz289 %0": ["ry90 %0", "rx289 %0", "ry270 %0"],
+        "rz296 %0": ["ry90 %0", "rx296 %0", "ry270 %0"],
+        "rz302 %0": ["ry90 %0", "rx302 %0", "ry270 %0"],
+        "rz309 %0": ["ry90 %0", "rx309 %0", "ry270 %0"],
+        "rz315 %0": ["ry90 %0", "rx315 %0", "ry270 %0"],
+        "rz321 %0": ["ry90 %0", "rx321 %0", "ry270 %0"],
+        "rz328 %0": ["ry90 %0", "rx328 %0", "ry270 %0"],
+        "rz334 %0": ["ry90 %0", "rx334 %0", "ry270 %0"],
+        "rz341 %0": ["ry90 %0", "rx341 %0", "ry270 %0"],
+        "rz347 %0": ["ry90 %0", "rx347 %0", "ry270 %0"],
+        "rz354 %0": ["ry90 %0", "rx354 %0", "ry270 %0"],
 
 
         // Clifford decomposition per Epstein et al. Phys. Rev. A 89, 062321 (2014)
@@ -343,6 +423,26 @@
                 "static_codeword_override": [8]
             }
         },
+        "rx45": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "x45",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [2]
+            }
+        },
+        "ry45": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "y45",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [3]
+            }
+        },
         "rx90": {
             "duration": @MW_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
@@ -361,6 +461,46 @@
             "cc": {
                 "ref_signal": "single-qubit-mw",
                 "static_codeword_override": [5]
+            }
+        },
+        "rx135": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "x135",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [6]
+            }
+        },
+        "ry135": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "y135",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [7]
+            }
+        },
+        "rx225": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "x225",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [10]
+            }
+        },
+        "ry225": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "y225",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [11]
             }
         },
         "rxm90": {
@@ -403,8 +543,27 @@
                 "static_codeword_override": [13]
             }
         },
-
-        
+        "rx315": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "x315",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [14]
+            }
+        },
+        "ry315": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "y315",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [15]
+            }
+        },
+   
         "cz_park": {
             "duration": @FLUX_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],

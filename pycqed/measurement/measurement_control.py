@@ -1940,7 +1940,7 @@ class MeasurementControl(Instrument):
         data_group = self.data_object.create_group("Experimental Data")
         ###################################re
         # added by RDC on 16-04-2024
-        if name_msmt == 'XOR_run':
+        if 'XOR' in name_msmt:
             self.dset = data_group.create_dataset(
                 "Data",
                 (0, len(self.sweep_functions) + len(self.detector_function.value_names)),
