@@ -4,6 +4,7 @@ Note:   a lot code was moved around within this file in December 2021. As a cons
         by 'git blame' makes little sense. See GIT tag 'release_v0.3' for the original file.
 """
 
+import os
 import time
 import logging
 import numpy as np
@@ -6711,7 +6712,7 @@ class HAL_Transmon(HAL_ShimSQ):
             # Using `with ...:` makes sure the other processes will be terminated
             # avoid starting too mane processes,
             # nr_processes = None will start as many as the PC can handle
-            nr_processes = None if recompile else 1
+            nr_processes = os.cpu_count() // 2 if recompile else 1
             with multiprocessing.Pool(nr_processes) as pool:
                 rb_tasks = send_rb_tasks(pool)
                 cl_oql.wait_for_rb_tasks(rb_tasks)

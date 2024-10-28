@@ -5,6 +5,7 @@ Note:   a lot code was moved around within this file in December 2021. As a cons
         by 'git blame' makes little sense. See GIT tag 'release_v0.3' for the original file.
 """
 
+import os
 import numpy as np
 import time
 import logging
@@ -3354,7 +3355,7 @@ class HAL_Device(HAL_ShimMQ):
             # Using `with ...:` makes sure the other processes will be terminated
             # avoid starting too mane processes,
             # nr_processes = None will start as many as the PC can handle
-            nr_processes = None if recompile else 1
+            nr_processes = os.cpu_count() // 4 if recompile else 1
             with multiprocessing.Pool(
                 nr_processes,
                 maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
@@ -3666,9 +3667,10 @@ class HAL_Device(HAL_ShimMQ):
             if pool is None:
                 # Using `with ...:` makes sure the other processes will be terminated
                 # `maxtasksperchild` avoid RAM issues
+                nr_processes = os.cpu_count() // 4
                 if not maxtasksperchild:
                     maxtasksperchild = cl_oql.maxtasksperchild
-                with multiprocessing.Pool(maxtasksperchild=maxtasksperchild) as pool:
+                with multiprocessing.Pool(nr_processes, maxtasksperchild=maxtasksperchild) as pool:
                     run_parallel_iRB(recompile=recompile,
                                     pool=pool,
                                     rb_tasks_start=rb_tasks_start)
@@ -4024,7 +4026,7 @@ class HAL_Device(HAL_ShimMQ):
             # Using `with ...:` makes sure the other processes will be terminated
             # avoid starting too mane processes,
             # nr_processes = None will start as many as the PC can handle
-            nr_processes = None if recompile else 1
+            nr_processes = os.cpu_count() // 4 if recompile else 1
             with multiprocessing.Pool(
                 nr_processes,
                 maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
@@ -4518,7 +4520,7 @@ class HAL_Device(HAL_ShimMQ):
             # Using `with ...:` makes sure the other processes will be terminated
             # avoid starting too mane processes,
             # nr_processes = None will start as many as the PC can handle
-            nr_processes = None if recompile else 1
+            nr_processes = os.cpu_count() // 4 if recompile else 1
             with multiprocessing.Pool(
                 nr_processes,
                 maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
@@ -4690,7 +4692,7 @@ class HAL_Device(HAL_ShimMQ):
             # Using `with ...:` makes sure the other processes will be terminated
             # avoid starting too mane processes,
             # nr_processes = None will start as many as the PC can handle
-            nr_processes = None if recompile else 1
+            nr_processes = os.cpu_count() // 4 if recompile else 1
             with multiprocessing.Pool(
                 nr_processes,
                 maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
