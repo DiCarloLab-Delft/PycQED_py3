@@ -1545,6 +1545,7 @@ class HAL_Device(HAL_ShimMQ):
             analyze=True,
             shots_per_meas: int = 2 ** 16,
             label='Mux_SSRO',
+            return_analysis=True,
             disable_metadata: bool = False,
             MC=None):
         """
@@ -1655,7 +1656,11 @@ class HAL_Device(HAL_ShimMQ):
                 threshold = a.qoi[label]['threshold_raw']
                 # LDC turning off this update for now. 2022/06/28
                 # self.find_instrument(qubit).ro_acq_threshold(threshold)
-        return a.plot_dicts['cross_fid_matrix_post']['prob_matrix']
+
+        if return_analysis:
+            return a.plot_dicts['cross_fid_matrix_post']['prob_matrix']
+        else:
+            return True
 
 
     def measure_ssro_single_qubit(
@@ -5668,15 +5673,16 @@ class HAL_Device(HAL_ShimMQ):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        for qubit in q_parks:
-            QUBIT = self.find_instrument(qubit)
-            flux_lm_QUBIT = self.find_instrument(QUBIT.instr_LutMan_Flux())
-            flux_lm_QUBIT.sq_length(q0_pulse_length)
-            flux_lm_QUBIT.park_length(q0_pulse_length)
-            flux_lm_QUBIT.sq_amp(0.25)
-            flux_lm_QUBIT.park_amp(0.25)
-            flux_lm_QUBIT.cfg_awg_channel_amplitude(0.3)
-        self.prepare_for_timedomain(qubits = q_parks, bypass_flux = False)
+        if len(q_parks)>0:
+            for qubit in q_parks:
+                QUBIT = self.find_instrument(qubit)
+                flux_lm_QUBIT = self.find_instrument(QUBIT.instr_LutMan_Flux())
+                flux_lm_QUBIT.sq_length(q0_pulse_length)
+                flux_lm_QUBIT.park_length(q0_pulse_length)
+                flux_lm_QUBIT.sq_amp(0.25)
+                flux_lm_QUBIT.park_amp(0.25)
+                flux_lm_QUBIT.cfg_awg_channel_amplitude(0.3)
+            self.prepare_for_timedomain(qubits = q_parks, bypass_flux = False)
         
         Q0 = self.find_instrument(q0)
         flux_lm_Q0 = self.find_instrument(Q0.instr_LutMan_Flux())
@@ -5697,8 +5703,9 @@ class HAL_Device(HAL_ShimMQ):
 
         q0_idx = Q0.cfg_qubit_nr()
         q_parks_idx = []
-        for q in q_parks:
-            q_parks_idx.append(self.find_instrument(q).cfg_qubit_nr())
+        if len(q_parks)>0:
+            for q in q_parks:
+                q_parks_idx.append(self.find_instrument(q).cfg_qubit_nr())
 
         p = mqo.T1_TLS(
             q0_idx = q0_idx,

@@ -280,7 +280,10 @@ class inspire_dep_graph_RO(AutoDepGraph_DAG):
 
         self.add_node('Cross Fidelity',
                         calibrate_function=self.device.name + '.measure_ssro_multi_qubit',
-                        calibrate_function_args={'qubits': qubit_list, 'initialize': True, 'disable_metadata': True})
+                        calibrate_function_args={'qubits': qubit_list,
+                                                 'initialize': True,
+                                                 'return_analysis': False,
+                                                 'disable_metadata': True})
 
         #########################
         # Create all dependencies
@@ -681,7 +684,7 @@ class inspire_dep_graph_2Q(AutoDepGraph_DAG):
         if CZindex==0:
           pair=['NW', 'W', 'C']
           flux_lm_C = self.device.find_instrument('flux_lm_C')
-          flux_lm_C.cfg_awg_channel_amplitude(0.32)
+          flux_lm_C.cfg_awg_channel_amplitude(0.4)
           self.device.prepare_for_timedomain(qubits = ['C'], bypass_flux = False)
         elif CZindex==1:
           pair=['NW', 'C', 'W']
@@ -690,7 +693,7 @@ class inspire_dep_graph_2Q(AutoDepGraph_DAG):
         elif CZindex==3:
           pair=['NE', 'E', 'C']
           flux_lm_C = self.device.find_instrument('flux_lm_C')
-          flux_lm_C.cfg_awg_channel_amplitude(0.392)
+          flux_lm_C.cfg_awg_channel_amplitude(0.4)
           self.device.prepare_for_timedomain(qubits = ['C'], bypass_flux = False)
         elif CZindex==4:
           pair=['W', 'SW']

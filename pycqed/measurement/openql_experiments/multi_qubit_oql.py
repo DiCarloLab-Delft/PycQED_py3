@@ -3750,8 +3750,9 @@ def T1_TLS(q0_idx: int,
     for i, time in enumerate(times[:-5]):
         k = p.create_kernel('T1_TLS_{}'.format(i))
         k.prepz(q0_idx)
-        for q_park in q_parks_idx:
-            k.prepz(q_park)
+        if len(q_parks_idx)>0:
+            for q_park in q_parks_idx:
+                k.prepz(q_park)
         k.barrier([])  # alignment workaround
 
         k.gate('rx180', [q0_idx])
@@ -3761,18 +3762,20 @@ def T1_TLS(q0_idx: int,
             k.measure(q0_idx)
             p.add_kernel(k)
         else:
-            k.gate('sf_square', [q0_idx])        
-            for q_park in q_parks_idx:
-                k.gate('sf_square', [q_park])  # square pulse
+            k.gate('sf_square', [q0_idx])
+            if len(q_parks_idx)>0:        
+                for q_park in q_parks_idx:
+                    k.gate('sf_square', [q_park])  # square pulse
             k.barrier([])  # alignment workaround
 
             wait_nanoseconds = int(round(time/1e-9))
             k.gate("wait", [q0_idx], wait_nanoseconds)
             k.barrier([])  # alignment workaround
 
-            k.gate('sf_square', [q0_idx])        
-            for q_park in q_parks_idx:
-                k.gate('sf_square', [q_park])  # square pulse
+            k.gate('sf_square', [q0_idx])
+            if len(q_parks_idx)>0:        
+                for q_park in q_parks_idx:
+                    k.gate('sf_square', [q_park])  # square pulse
             k.barrier([])  # alignment workaround
 
             k.measure(q0_idx)
