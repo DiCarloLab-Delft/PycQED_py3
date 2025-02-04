@@ -242,7 +242,7 @@ class HAL_ShimMQ(Instrument):
         # self._prep_td_configure_VSM()
 
     def prepare_for_inspire(self):
-
+        from datetime import datetime
         # LDC. Trying to ensure readout is digitized, uses optimal weights, and does single shots w/o averaging
         self.ro_acq_digitized(True)
         self.ro_acq_weight_type('optimal')
@@ -281,7 +281,12 @@ class HAL_ShimMQ(Instrument):
         with measurement_control.h5d.Data(
             name=MC._get_measurement_name(), datadir=MC.datadir()
         ) as MC.data_object:
-            MC._get_measurement_begintime()
+            date_str = MC._get_measurement_begintime()
+
+            dt = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+            snapshot_timestamp = dt.strftime('%Y%m%d_%H%M%S')
+            self.latest_snapshot_timestamp(snapshot_timestamp)
+
             MC._save_instrument_settings(MC.data_object)
 
         return True
@@ -660,13 +665,20 @@ class HAL_ShimMQ(Instrument):
             initial_value = False,
         )
 
-        # ADDED BY RDC 22-03-2023
         self.add_parameter(
             "use_online_settings",
             docstring="If True, it uses HAL_ShimMQ.py lines for Quantum Inspire",
             parameter_class=ManualParameter,
             vals=vals.Bool(),
             initial_value = False,
+        )
+
+        self.add_parameter(
+            "latest_snapshot_timestamp",
+            docstring="If true, it does postselection using the hidden initialization "
+                      "in execution.py.",
+            parameter_class=ManualParameter,
+            vals=vals.Strings()
         )
 
     def _add_parameters(self):

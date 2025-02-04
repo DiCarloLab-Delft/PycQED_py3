@@ -280,7 +280,7 @@ class Qubit(Instrument):
         raise NotImplementedError()
 
 
-    def measure_spectroscopy(self, freqs, pulsed=True, MC=None,
+    def measure_spectroscopy(self, cw_spec_power, freqs, pulsed=True, MC=None,
                              analyze=True, close_fig=True):
         raise NotImplementedError()
 
@@ -1221,6 +1221,7 @@ class Qubit(Instrument):
             spec_mode='pulsed_marked',
             steps=[1, 3, 10, 30, 100],
             artificial_periods=4,
+            cw_spec_power: float = None,
             freqs=None,
             f_span=100e6,
             use_max=False,
@@ -1252,7 +1253,7 @@ class Qubit(Instrument):
 
             spec_mode (str {'CW', 'pulsed_marked', 'pulsed_mixer'}):
                 specifies the mode of the spectroscopy measurements (currently only implemented
-                by Timo for CCL_Transmon). Possivle values: 'CW', 'pulsed_marked', 'pulsed_mixer'
+                by Timo for CCL_Transmon). Possible values: 'CW', 'pulsed_marked', 'pulsed_mixer'
 
             steps (array):
                 maximum delay between pi/2 pulses (in microseconds) in a subsequent ramsey measurements.
@@ -1262,6 +1263,10 @@ class Qubit(Instrument):
             artificial_periods (float):
                 specifies the automatic choice of the artificial detuning in the ramsey
                 measurements, in such a way that ramsey measurement should show 4 full oscillations.
+
+            cw_spec_power (float):
+                specifies the power level of the local oscillator (LO) which is used for continuous wave (CW)
+                spectroscopy of the qubit.
 
             freqs (array):
                 list of sweeped frequencies in case of spectroscopy measurement
@@ -1284,7 +1289,7 @@ class Qubit(Instrument):
                                   f_qubit_estimate + f_span/2,
                                   f_step)
             # args here should be handed down from the top.
-            self.measure_spectroscopy(freqs, mode=spec_mode, MC=MC,
+            self.measure_spectroscopy(cw_spec_power, freqs, mode=spec_mode, MC=MC,
                                       analyze=False, label = label,
                                       close_fig=close_fig)
 

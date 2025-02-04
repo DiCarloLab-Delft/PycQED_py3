@@ -2202,6 +2202,19 @@ class HAL_Device(HAL_ShimMQ):
             ma2.Basic2DInterpolatedAnalysis()
 
 
+
+        Q0 = MC.find_instrument(q0)
+        try:
+            ma2.tqg.Chevron_Analysis(Poly_coefs = fl_lutman.q_polycoeffs_freq_01_det(),
+                         QH_freq =Q0.freq_qubit(),
+                         QL_det = 0.0,
+                         Out_range = fl_lutman.cfg_awg_channel_range(),
+                         DAC_amp = fl_lutman.sq_amp())
+            print('Success!')
+        except:
+            print('Fit failed')
+
+
     def measure_chevron_1D_bias_sweeps(
         self,
         q0: str,
@@ -6171,7 +6184,7 @@ class HAL_Device(HAL_ShimMQ):
         '''
         The goal of this routine is to calibrate the single-qubit phase of a qubit q0 during a CZ between q0 and q1.
         The Ramsey'd qubit is always q0 (the first element in operation_pair).
-        The control qubit is always q1 (the second element in opertion_pair). 
+        The control qubit is always q1 (the second element in operation_pair). 
         This routine also updates the two-qubit-phase found in the q0 object.
         Leo DC, 22/06/24
         '''
@@ -6207,6 +6220,7 @@ class HAL_Device(HAL_ShimMQ):
             dphi0 = np.mod(dphi0,360) # ensure modulo 360 degrees.
             # finally, compare to threshold
             if (dphi0 <= eps or np.abs(dphi0-360) <= eps):
+                q0.prepare_for_timedomain()
                 return True
             else:   # if not within threshold, update the single-qubit phase
                 # get previous single-qubit phase
@@ -6224,9 +6238,9 @@ class HAL_Device(HAL_ShimMQ):
             disable_metadata = False
             ):
         '''
-        The goal of this routine is to cabrate the single-qubit phase of the parked qubit in a CZ gate.
+        The goal of this routine is to calibrate the single-qubit phase of the parked qubit in a CZ gate.
         The Ramsey'd qubit in the CZ pair is always q0 (the first element in operation_pair).
-        The control qubit in the CZ pair is always q1 (the second element in opertion_pair). 
+        The control qubit in the CZ pair is always q1 (the second element in operation_pair). 
         The parked qubit is q2. It is also Ramsey'd.
         Leo DC, 22/06/18
         '''
@@ -6254,6 +6268,7 @@ class HAL_Device(HAL_ShimMQ):
             
             # finally, compare to threshold
             if ((dphi0 <= eps) or (np.abs(dphi0-360) <= eps)):
+                q2.prepare_for_timedomain()
                 return True
             else:   # if not within threshold, update the single-qubit phase
                 # get previous single-qubit phase
@@ -6266,6 +6281,97 @@ class HAL_Device(HAL_ShimMQ):
                 mw_lm_q2.vcz_virtual_q_ph_corr_park(np.mod(previous_dphi0+dphi0,360))
         return False
 
+    def sweep_parking_freq(
+            self,
+            qubit_pair: list,
+            parked_qubit: str,
+            parked_qubit_detunings: list, # in [Hz]
+            disable_metadata = True
+    ):
+        """
+        This routine sweeps the cfg_awg_channel_amplitude() of the parked qubit to match the
+        selected values of parked_qubit_detunings and measures the parked qubit conditional
+        oscillation, as well as the missing fraction of the qubit_pair. The goal is to
+        find an optimal detuning frequency for the parked qubit which minimizes both
+        the parked qubit 'on/off' phase difference, as well as minimize the missing fraction.
+
+        qubit_pair: a list containing as the first entry the high frequency qubit and as the second
+                    entry the low frequency qubit making up a two-qubit gate
+                    e.g. qubit_pair = ['NW', 'W']
+        parked_qubit: the qubit that is parked during the two-qubit gate operation
+                    e.g. parked_qubit = 'C'
+        parked_qubit_detunings: a list of all detuning values that will be used during the measurement
+                                for the parked qubit, in units of [Hz]
+
+        Author: Marios Samiotis, Nov 26 2024
+        """
+        import matplotlib.pyplot as plt
+
+        MC = self.instr_MC.get_instr()
+        data_folder_dir = MC.datadir.raw_value + "\\qubit_detuning_sweeps\\"
+        if os.path.isdir(data_folder_dir):
+            pass
+        else:
+            os.makedirs(data_folder_dir, exist_ok=False)
+
+        self.ro_acq_weight_type('optimal')
+        calibrate_parking_phase = self.calibrate_parking_phase_GBT(pair = [qubit_pair[0], qubit_pair[1], parked_qubit],
+                                                                   eps = 5)
+        if calibrate_parking_phase == False:
+            raise ValueError("Parking qubit phase must be calibrated before running this routine.")
+        
+        q2 = self.find_instrument(parked_qubit)
+        flux_lm_q2 = q2.instr_LutMan_Flux.get_instr()
+        initial_awg_ch_amp = flux_lm_q2.cfg_awg_channel_amplitude()
+
+        dphi_values = []
+        missing_fraction_values = []
+
+        def phase_difference(phase1, phase2):
+            diff = abs(phase1 - phase2) % 360
+            return min(diff, 360 - diff)
+
+        for detuning in parked_qubit_detunings:
+
+            output_voltage = calculate_output_voltage_from_detuning(detuning, flux_lm_q2)
+            awg_channel_amplitude = calculate_amplitude_from_output_voltage(output_voltage, 0.25, flux_lm_q2)
+            flux_lm_q2.cfg_awg_channel_amplitude(awg_channel_amplitude)
+            self.prepare_fluxing(qubits = [parked_qubit])
+
+            # run the conditional oscillation experiment
+            a = self.measure_conditional_oscillation(q0=qubit_pair[0], q1=qubit_pair[1], q2=parked_qubit, parked_qubit_seq='ramsey',
+                                                    disable_metadata = disable_metadata)
+               
+            phi_off = a.proc_data_dict['quantities_of_interest']['park_phase_off'].nominal_value
+            phi_on = a.proc_data_dict['quantities_of_interest']['park_phase_on'].nominal_value
+            missing_fraction = a.proc_data_dict['quantities_of_interest']['missing_fraction'].nominal_value * 100
+
+            dphi_value = phase_difference(phi_off, phi_on)
+
+            dphi_values.append(dphi_value)
+            missing_fraction_values.append(missing_fraction)
+
+        flux_lm_q2.cfg_awg_channel_amplitude(initial_awg_ch_amp)
+        self.prepare_fluxing(qubits = [parked_qubit])    
+
+        timestamp = MC.run_history.raw_value[-1]['begintime']
+        fig, ax1 = plt.subplots()
+
+        ax1.scatter(np.array(parked_qubit_detunings) * 1e-6, dphi_values, color='#1f77b4', label='phase diff')
+        ax1.plot(np.array(parked_qubit_detunings) * 1e-6, dphi_values, color='#1f77b4', alpha=0.3)
+        ax1.set_xlabel("Parked qubit detuning [MHz]")
+        ax1.set_ylabel("Parked qubit 'on/off' phase difference [degrees]", color='#1f77b4')
+        ax1.tick_params(axis='y', labelcolor='#1f77b4')
+
+        ax2 = ax1.twinx()
+        ax2.scatter(np.array(parked_qubit_detunings) * 1e-6, missing_fraction_values, color='#ff7f0e', label='missing fraction')
+        ax2.plot(np.array(parked_qubit_detunings) * 1e-6, missing_fraction_values, color='#ff7f0e', alpha=0.3)
+        ax2.set_ylabel("Missing fraction [%]", color='#ff7f0e')
+        ax2.tick_params(axis='y', labelcolor='#ff7f0e')
+
+        plt.title(f"{timestamp}\nQubit pair {qubit_pair[0]}-{qubit_pair[1]}, parked qubit {parked_qubit} detuning sweep")
+        plt.savefig(f"{data_folder_dir}" + f"prk_qubit_{parked_qubit}_sweep_{timestamp}.png", dpi=300)
+        plt.close()
 
     def calibrate_multi_frequency_fine(
             self,
@@ -7137,3 +7243,231 @@ class HAL_Device(HAL_ShimMQ):
                 return ('SE', 'NW')
             else:
                 return ('NW', 'SE')
+            
+    def set_inspire_averaging(self,
+                      default_acq_averages = 4096,
+                      default_soft_averages = 1):
+        '''
+        This function sets averaging uniformly for all qubits
+        aa : readout acquisition averages to set for all qubits
+        sa : soft averages to set for all qubits
+        '''
+        qubit_list = []
+        for qubit_str in self.qubits():
+            QUBIT = self.find_instrument(qubit_str)
+            qubit_list.append(QUBIT)
+
+        for qubit in qubit_list:
+            qubit.ro_acq_averages(default_acq_averages)
+            qubit.ro_soft_avg(default_soft_averages)
+        self.ro_acq_averages(default_acq_averages)
+
+    def set_inspire_acq_type(self):
+        qubit_list = []
+        for qubit_str in self.qubits():
+            QUBIT = self.find_instrument(qubit_str)
+            qubit_list.append(QUBIT)
+
+        for QUBIT in qubit_list:
+            QUBIT.ro_acq_weight_type('optimal')
+            QUBIT.ro_acq_digitized(True)
+        self.ro_acq_weight_type('optimal')
+        self.ro_acq_digitized(True)
+            
+    def prepare_s7_readout(self):
+        self.set_inspire_averaging()
+        self.set_inspire_acq_type()
+        self.prepare_for_inspire()
+
+    def create_s7_calibration_data_dict(self):
+
+        qubit_data = {
+            'chip_name': 'Megha',
+            'chip_type': 'Surface-7',
+            'qubit_type': 'Flux-tunable transmons',
+            'ro_duration [s]': 1e-6,
+            '1Q-gate duration [s]': 20e-9,
+            '2Q-gate duration [s]': 60e-9,
+            'latest_snapshot_timestamp': self.latest_snapshot_timestamp(),
+            'calibration_metadata': {}
+        }
+
+        qubit_list = self.qubits()
+        qubit_objects = []
+        for qubit in qubit_list:
+            QUBIT = self.find_instrument(qubit)
+            qubit_objects.append(QUBIT)
+
+        for QUBIT in qubit_objects:
+            qubit_data[QUBIT.name] = {'qubit_nr': int(QUBIT.cfg_qubit_nr()),
+                                'qubit_name': QUBIT.name,
+                                'qubit_frequency [Hz]': float(QUBIT.freq_qubit()),
+                                'anharmonicity [Hz]': float(QUBIT.anharmonicity()),
+                                'ro_frequency [Hz]': float(QUBIT.ro_freq()),
+                                'ro_pulse_length [s]': float(QUBIT.ro_pulse_length()),
+                                'T1 [s]': float(QUBIT.T1()),
+                                'T2_star [s]': float(QUBIT.T2_star()),
+                                'T2_echo [s]': float(QUBIT.T2_echo()),
+                                'F_init': float(QUBIT.F_init()),
+                                'F_ssro': float(QUBIT.F_ssro()),
+                                'F_RB': float(QUBIT.F_RB())}
+            
+        qubit_data['F_2QRB'] = {
+            'Q0-Q2 (NW-W)': float(qubit_objects[0].F_2QRB_SW()),
+            'Q0-Q3 (NW-C)': float(qubit_objects[0].F_2QRB_SE()),
+            'Q1-Q3 (NE-C)': float(qubit_objects[2].F_2QRB_SW()),
+            'Q1-Q4 (NE-E)': float(qubit_objects[2].F_2QRB_SE()),
+            'Q2-Q5 (W-SW)': float(qubit_objects[1].F_2QRB_SE()),
+            'Q3-Q5 (C-SW)': float(qubit_objects[3].F_2QRB_SW()),
+            'Q3-Q6 (C-SE)': float(qubit_objects[3].F_2QRB_SE()),
+            'Q4-Q6 (E-SE)': float(qubit_objects[4].F_2QRB_SW())
+        }
+
+        qubit_data['averages'] = {
+            'T1 [s]': None,
+            'T2_star [s]': None,
+            'T2_echo [s]': None,
+            'F_init': None,
+            'F_ssro': None,
+            'F_RB': None,
+            'F_2QRB': None
+        }
+
+        return qubit_data
+                    
+    def calibrate_for_inspire(self,
+                              calilbrate_RO = True,
+                              calibrate_1Q_gates = True,
+                              calibrate_2Q_gates = True,
+                              calibrate_A_vs_B = False,
+                              datadir = r'C:\Experiments\202401_S7_Megha\Data\QI_calibration_data'):
+        import pycqed.instrument_drivers.meta_instrument.inspire_dependency_graph as IDG
+        import json
+
+
+        qubit_list = self.qubits()
+
+        for qubit in qubit_list:
+            QUBIT = self.find_instrument(qubit)
+            QUBIT.ro_acq_averages(2**12)
+        self.ro_acq_averages(2**12)
+
+        dagRO_duration = 0
+        if calilbrate_RO == True:
+            initial_time = time.time()
+            dagRO = IDG.inspire_dep_graph_RO(name='dagRO', device=self)
+            dagRO.set_all_node_states('needs calibration')
+            dagRO.update_monitor()
+            try:
+                dagRO.maintain_Prep_Inspire()
+            except:
+                logging.error("Readout calibrations failed!")
+            dagRO_duration = time.time() - initial_time
+
+        dag_1Q_duration = 0
+        non_cal_qubits = []
+        if calibrate_1Q_gates == True:
+            initial_time = time.time()
+            dag_1QPar = IDG.inspire_dep_graph_1Qpar(name='dag_1QPar', device=self)
+            dag_1QPar.set_all_node_states('needs calibration')
+            dag_1QPar.update_monitor()
+            try:
+                dag_1QPar.maintain_Prep_Inspire()
+            except:
+                logging.error("Parallel single-qubit calibrations failed!")
+                logging.error("Initiating single-qubit calibrations...")
+                for qubit in qubit_list:
+                    dag_1Q = IDG.inspire_dep_graph_1Q(name=f"dag_1Q_{qubit}", qubitname=qubit, device=self)
+                    dag_1Q.set_all_node_states('needs calibration')
+                    dag_1Q.update_monitor()
+                    try:
+                        dag_1Q.maintain_Prep_Inspire()
+                    except:
+                        logging.error(f"Single-qubit calibrations of qubit {qubit} failed!")
+                        non_cal_qubits.append(qubit)
+            dag_1Q_duration = time.time() - initial_time
+
+        dag2Q_duration = 0
+        non_cal_qubit_pairs = []
+        if calibrate_2Q_gates == True:
+            self.prepare_for_timedomain(qubits = qubit_list, bypass_flux = False)
+            initial_time = time.time()
+            for qubit_pair in [0, 1, 2, 3, 4, 5, 6, 7]:
+                dag2Q = IDG.inspire_dep_graph_2Q(name='dag2Q', device=self, CZindex = qubit_pair)
+                dag2Q.set_all_node_states('needs calibration')
+                if calibrate_A_vs_B == False:
+                    dag2Q.set_node_state(node_name="SNZ", state="good")
+                dag2Q.update_monitor()
+                try:
+                    dag2Q.maintain_Prep_Inspire()
+                except:
+                    logging.error(f"Calibration of qubit pair '{qubit_pair}' failed!")
+                    non_cal_qubit_pairs.append(qubit_pair)
+            dag2Q_duration = time.time() - initial_time
+
+        self.prepare_for_inspire() # in order to obtain latest system_snapshot timestamp
+                                   # this ensures that even if all calibrations fail
+                                   # we will still have the timestamp with the latest
+                                   # parameters of the processor
+        qubit_data = self.create_s7_calibration_data_dict()
+
+        qubit_data['calibration_metadata']['Calibrate RO'] = calilbrate_RO
+        qubit_data['calibration_metadata']['Calibrate 1Q gates'] = calibrate_1Q_gates
+        qubit_data['calibration_metadata']['Calibrate 2Q gates'] = calibrate_2Q_gates
+        qubit_data['calibration_metadata']['Calibrate A vs B landscapes'] = calibrate_A_vs_B
+        qubit_data['calibration_metadata']['DAG_RO_duration [s]'] = dagRO_duration
+        qubit_data['calibration_metadata']['DAG_1Q_duration [s]'] = dag_1Q_duration
+        qubit_data['calibration_metadata']['DAG_2Q_duration [s]'] = dag2Q_duration
+        qubit_data['calibration_metadata']['Non-calibrated qubits'] = non_cal_qubits
+        qubit_data['calibration_metadata']['Non-calibrated qubit pairs'] = non_cal_qubit_pairs
+
+        json_file_path = os.path.join(datadir, f"{qubit_data['latest_snapshot_timestamp']}_QI_calibration_data.json")
+        with open(json_file_path, "w") as json_file:
+            json.dump(qubit_data, json_file, indent=3)  # You can adjust the indentation level as needed
+
+def desired_detuning(q_target_freq, q_target_anharm, q_control_freq):
+    """
+    anharmonicity should be of negative value
+    """
+    if q_target_freq < q_control_freq:
+        raise ValueError("q_target should be the high-frequency qubit, q_target > q_control")
+    if q_target_anharm > 0.0:
+        raise ValueError("Anharmonicity needs to be negative")
+    desired_q_target_freq = q_control_freq - q_target_anharm
+    detuning = q_target_freq - desired_q_target_freq
+    print('Detuning', detuning * 10**-6, 'MHz')
+    print('Target qubit frequency', desired_q_target_freq * 10**-9, 'GHz')
+    return detuning
+
+def calculate_qubit_detuning(qubit_flux_lm, awg_output_voltage):
+    # detuning is calculated in Hz, voltage should be in V
+    qubit_detuning = 0
+    N = len(qubit_flux_lm.q_polycoeffs_freq_01_det())
+    for n in range(N):
+        qubit_detuning += qubit_flux_lm.q_polycoeffs_freq_01_det()[N - n - 1] * awg_output_voltage**n
+
+    return qubit_detuning
+
+def calculate_amplitude_from_output_voltage(awg_output_voltage, sq_amp, qubit_flux_lutman):
+    awg_channel_range = qubit_flux_lutman.cfg_awg_channel_range() # HDAWG Vpp
+    awg_channel_amplitude = awg_output_voltage / (awg_channel_range * sq_amp / 2)
+
+    return awg_channel_amplitude
+
+def calculate_output_voltage_from_amplitude(awg_channel_amplitude, sq_amp, qubit_flux_lutman):
+    awg_channel_range = qubit_flux_lutman.cfg_awg_channel_range() # HDAWG Vpp
+    awg_output_voltage = awg_channel_amplitude * (awg_channel_range * sq_amp / 2)
+
+    return awg_output_voltage
+
+def calculate_output_voltage_from_detuning(qubit_detuning, qubit_flux_lm):
+
+    from scipy.optimize import minimize
+
+    def cost_function(voltage_value):
+        calculated_detuning = calculate_qubit_detuning(qubit_flux_lm, voltage_value)
+        return np.abs(calculated_detuning - qubit_detuning)
+    
+    result = minimize(cost_function, x0=0.2, method='nelder-mead')
+    
+    return result.x[0]

@@ -2961,6 +2961,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
     def measure_spectroscopy(
             self,
+            cw_spec_power,
             freqs,
             mode='pulsed_marked',
             MC: Optional[MeasurementControl] = None,
@@ -2993,7 +2994,7 @@ class HAL_Transmon(HAL_ShimSQ):
         """
         if mode == 'CW':
             self._measure_spectroscopy_CW(
-                freqs=freqs, MC=MC,
+                cw_spec_power=cw_spec_power, freqs=freqs, MC=MC,
                 analyze=analyze, close_fig=close_fig,
                 label=label,
                 prepare_for_continuous_wave=prepare_for_continuous_wave
@@ -3135,9 +3136,7 @@ class HAL_Transmon(HAL_ShimSQ):
             fl_lutman.q_polycoeffs_freq_01_det(p_coefs)
         return a
 
-# Adding measurement butterfly from pagani detached. RDC 16-02-2023
-
-    def measure_msmt_butterfly(
+    def measurement_butterfly(
             self,
             prepare_for_timedomain: bool = True,
             calibrate_optimal_weights: bool = False,
@@ -3149,9 +3148,16 @@ class HAL_Transmon(HAL_ShimSQ):
             depletion_analysis: bool = False, 
             depletion_optimization_window = None):
         
+        init_ro_acq_weight_type = self.ro_acq_weight_type()
+        init_ro_acq_digitized = self.ro_acq_weight_type()
+        
         # ensure readout settings are correct
-        assert self.ro_acq_weight_type() != 'optimal'
-        assert self.ro_acq_digitized() == False
+        print("Changing readout settings ...")
+        print("1. setting ro_acq_weight_type to 'optimal IQ' ")
+        print("2. setting ro_acq_weight_type to 'False' ")
+
+        self.ro_acq_weight_type('optimal IQ')
+        self.ro_acq_weight_type(False)
 
         if calibrate_optimal_weights:
             r = self.calibrate_optimal_weights(
@@ -3202,6 +3208,11 @@ class HAL_Transmon(HAL_ShimSQ):
             label='butterfly',
             f_state=f_state,
             extract_only=no_figs)
+        
+        print("Reverting readout settings to previous values ...")
+        self.ro_acq_weight_type(init_ro_acq_weight_type)
+        self.ro_acq_weight_type(init_ro_acq_digitized)
+        self.prepare_for_timedomain()
 
         # calculate the cost function
         c = {}
@@ -4993,6 +5004,14 @@ class HAL_Transmon(HAL_ShimSQ):
             self.prepare_for_timedomain()
             self.mw_channel_amp(old_channel_amp)
         elif mode == 'CW' or mode == 'pulsed_marked':
+            init_mw_mixer_offs_GI = self.mw_mixer_offs_GI()
+            init_mw_mixer_offs_GQ = self.mw_mixer_offs_GQ()
+
+            print(f"Setting qubit {self.name} MW mixer offsets to zero ...")
+            self.mw_mixer_offs_GI(0.0)
+            self.mw_mixer_offs_GQ(0.0)
+            self.prepare_for_timedomain()
+            
             self.prepare_for_continuous_wave()
         else:
             logging.error('Mode {} not recognized'.format(mode))
@@ -5050,6 +5069,12 @@ class HAL_Transmon(HAL_ShimSQ):
         self.int_avg_det_single.always_prepare = True
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Qubit_dac_scan' + self.msmt_suffix, mode='2D')
+
+        if mode == 'CW' or mode == 'pulsed_marked':
+            print(f"Setting qubit {self.name} MW mixer offsets back to ther initial value ...")
+            self.mw_mixer_offs_GI(init_mw_mixer_offs_GI)
+            self.mw_mixer_offs_GQ(init_mw_mixer_offs_GQ)
+            self.prepare_for_timedomain()
 
         if analyze:
             return ma.TwoD_Analysis(
@@ -5190,6 +5215,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
     def _measure_spectroscopy_CW(
             self,
+            cw_spec_power,
             freqs,
             MC: Optional[MeasurementControl] = None,
             analyze=True,
@@ -5211,7 +5237,20 @@ class HAL_Transmon(HAL_ShimSQ):
             label (str):
                 suffix to append to the measurement label
         """
+
+        init_mw_mixer_offs_GI = self.mw_mixer_offs_GI()
+        init_mw_mixer_offs_GQ = self.mw_mixer_offs_GQ()
+        init_spec_pow = self.spec_pow()
+
+        print(f"Setting qubit {self.name} MW mixer offsets to zero ...")
+        self.mw_mixer_offs_GI(0.0)
+        self.mw_mixer_offs_GQ(0.0)
+        self.prepare_for_timedomain()
+
         if prepare_for_continuous_wave:
+            if cw_spec_power != None:
+                print(f"Setting CW source power level ...")
+                self.spec_pow(cw_spec_power)
             self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -5244,6 +5283,17 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.run(name='CW_spectroscopy' + self.msmt_suffix + label)
 
         self.hal_acq_spec_mode_off()
+
+        print(f"Setting qubit {self.name} MW mixer offsets back to ther initial value ...")
+        self.mw_mixer_offs_GI(init_mw_mixer_offs_GI)
+        self.mw_mixer_offs_GQ(init_mw_mixer_offs_GQ)
+        self.prepare_for_timedomain()
+
+        if prepare_for_continuous_wave:
+            if cw_spec_power != None:
+                print(f"Setting CW source power level to initial value ...")
+                self.spec_pow(init_spec_pow)
+                self.prepare_for_continuous_wave()
 
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
