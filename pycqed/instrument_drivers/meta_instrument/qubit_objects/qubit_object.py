@@ -1159,7 +1159,8 @@ class Qubit(Instrument):
             update=True,
             freqs=None,
             MC=None,
-            close_fig=True
+            close_fig=True,
+            LO_freq_mod = -100e6
     ):
         # USED_BY: device_dependency_graphs.py,
         """
@@ -1181,6 +1182,14 @@ class Qubit(Instrument):
                 list of frequencies to sweep. By default set to +-5 MHz around
                 the last recorded frequency, with 100 kHz step
         """
+
+        print(f'Setting {self.instr_LutMan_RO()} to None value ...')
+        RO_lutman = self.find_instrument(self.instr_LutMan_RO())
+        old_LO_freq = RO_lutman.LO_freq()
+        RO_lutman.LO_freq(None)
+
+        self.ro_freq_mod(LO_freq_mod)
+        self.prepare_readout()
 
         # This snippet exists to be backwards compatible 9/2017. FIXME: cleanup
         try:
@@ -1209,6 +1218,11 @@ class Qubit(Instrument):
         elif update:  # don't update if the value is out of the scan range
             freq_res_par(f_res)
             freq_RO_par(f_res)
+
+        print(f'Setting {self.instr_LutMan_RO()} to its previous value ...')
+        RO_lutman.LO_freq(old_LO_freq)
+        self.prepare_readout()
+
         return f_res
 
     ##########################################################################

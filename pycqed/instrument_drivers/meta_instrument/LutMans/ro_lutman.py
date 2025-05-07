@@ -466,9 +466,13 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         )
         # Parameter that stores LO frequency.
         # NB: this appears to be the primary place where this information is stored, it is not set from code within PycQED
+
+        none_validator = vals.Validator() # and attempt to include None. I would use vals = vals.MultiTypeAnd(vals.Numbers(), none_validator) but it doesn't work
+        none_validator.is_numeric = False
+        none_validator._valid_values = tuple([None])
         self.add_parameter(
-            'LO_freq',
-            vals=vals.Numbers(),
+            'LO_freq', # 20250429 MS, I have removed 'vals' because None should also be valid. It's an ugly solution since I
+                        # could not figure out how to enable both vals.Numbers() and None in an elegant manner
             unit='Hz',
             parameter_class=ManualParameter,
             initial_value=None

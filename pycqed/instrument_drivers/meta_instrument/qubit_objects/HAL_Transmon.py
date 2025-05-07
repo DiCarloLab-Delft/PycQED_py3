@@ -822,13 +822,25 @@ class HAL_Transmon(HAL_ShimSQ):
     # calibrate_ functions (HAL_Transmon specific)
     ##########################################################################
 
-    def calibrate_ro_pulse_amp_CW(self, freqs=None, powers=None, update=True):
+    def calibrate_ro_pulse_amp_CW(self,
+                                  freqs=None,
+                                  powers=None,
+                                  update=True,
+                                  LO_freq_mod = -100e6):
         # USED_BY: device_dependency_graphs.py
         """
         Does a resonator power scan and determines at which power the low power
         regime is exited. If update=True, will set the readout power to this
         power.
         """
+
+        print(f'Setting {self.instr_LutMan_RO()} to None value ...')
+        RO_lutman = self.find_instrument(self.instr_LutMan_RO())
+        old_LO_freq = RO_lutman.LO_freq()
+        RO_lutman.LO_freq(LO_freq_mod)
+
+        self.ro_freq_mod(-100e6)
+        self.prepare_readout()
 
         if freqs is None:
             freq_center = self.freq_res()
@@ -853,6 +865,10 @@ class HAL_Transmon(HAL_ShimSQ):
                 logging.info('No qubit frquency found. Updating with RWA to {}'
                              .format(f_qubit_estimate))
                 self.freq_qubit(f_qubit_estimate)
+
+        print(f'Setting {self.instr_LutMan_RO()} to its previous value ...')
+        RO_lutman.LO_freq(old_LO_freq)
+        self.prepare_readout()
 
         return True
 
@@ -4874,6 +4890,7 @@ class HAL_Transmon(HAL_ShimSQ):
             analyze: bool = True,
             close_fig: bool = True,
             fluxChan=None,
+            LO_freq_mod = -100e6,
             label=''
     ):
         """
@@ -4904,6 +4921,15 @@ class HAL_Transmon(HAL_ShimSQ):
             fluxChan (str):
                 channel of the flux control instrument corresponding to the qubit
         """
+
+        print(f'Setting {self.instr_LutMan_RO()} to None value ...')
+        RO_lutman = self.find_instrument(self.instr_LutMan_RO())
+        old_LO_freq = RO_lutman.LO_freq()
+        RO_lutman.LO_freq(None)
+
+        self.ro_freq_mod(LO_freq_mod)
+        self.prepare_readout()
+
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -4941,6 +4967,10 @@ class HAL_Transmon(HAL_ShimSQ):
 
         if analyze:
             ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig)
+
+        print(f'Setting {self.instr_LutMan_RO()} to its previous value ...')
+        RO_lutman.LO_freq(old_LO_freq)
+        self.prepare_readout()
 
     def measure_qubit_frequency_dac_scan(
             self, freqs,
@@ -6068,7 +6098,8 @@ class HAL_Transmon(HAL_ShimSQ):
             MC: Optional[MeasurementControl] = None,
             analyze: bool = True,
             prepare: bool = True,
-            Pulse_comb: list=['off', 'on']
+            Pulse_comb: list=['off', 'on'],
+            LO_freq_mod = -100e6
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs
@@ -6085,6 +6116,14 @@ class HAL_Transmon(HAL_ShimSQ):
             freqs (array):
                 sweeped range of ro_freq
         """
+
+        print(f'Setting {self.instr_LutMan_RO()} to None value ...')
+        RO_lutman = self.find_instrument(self.instr_LutMan_RO())
+        old_LO_freq = RO_lutman.LO_freq()
+        RO_lutman.LO_freq(None)
+
+        self.ro_freq_mod(LO_freq_mod)
+        self.prepare_readout()
 
         # docstring from parent class
         if MC is None:
@@ -6136,8 +6175,16 @@ class HAL_Transmon(HAL_ShimSQ):
             # Dispersive shift from peak finder
             print('dispersive shift is {} MHz'.format(
                 a.qoi['dispersive_shift'] * 1e-6))
+            
+            print(f'Setting {self.instr_LutMan_RO()} to its previous value ...')
+            RO_lutman.LO_freq(old_LO_freq)
+            self.prepare_readout()
 
             return True
+        
+        print(f'Setting {self.instr_LutMan_RO()} to its previous value ...')
+        RO_lutman.LO_freq(old_LO_freq)
+        self.prepare_readout()
 
     def measure_error_fraction(
             self,

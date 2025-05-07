@@ -7109,6 +7109,146 @@ class HAL_Device(HAL_ShimMQ):
             mw_lm.set(mw_phase_param, phi)
 
         return a.qoi
+    
+    def measure_TLS_landscape(self,
+                              qubit,
+                              qubit_parks = None,
+                              detuning = None,
+                              two_qubit_gate_duration = 40e-9,
+                              max_duration = 40e-9):
+        '''
+        Wrapper function for measurement of TLS density.
+        Using a dynamical square pulse to flux the qubit
+        away while parking park_qubits.
+        Args:
+            qubit: fluxed qubit.
+            park_qubits: list of parked qubits.
+        '''
+        old_ro_acq_weight_type = self.ro_acq_weight_type()
+        old_ro_acq_averages = self.ro_acq_averages()
+        old_ro_acq_digitized = self.ro_acq_digitized()
+
+        self.ro_acq_weight_type('optimal')
+        self.ro_acq_averages(2**8)
+        self.ro_acq_digitized(True)
+
+        if qubit_parks == None:
+            qubit_parks = {
+                'NW': ['W', 'C'],
+                'NE': ['C', 'E'],
+                'W':  ['SW'],
+                'C': ['SW', 'SE'],
+                'E': ['SE'],
+                'SW': [],
+                'SE': []
+            }
+        # Setup for measurement
+        MC = self.find_instrument('MC')
+        MC.live_plot_enabled(False)
+        nested_MC = self.find_instrument('nested_MC')
+        nested_MC.live_plot_enabled(False)
+
+        qubit_object = self.find_instrument(qubit)
+        Flux_lm_q = qubit_object.instr_LutMan_Flux.get_instr()
+
+        det_0 = Flux_lm_q.q_polycoeffs_freq_01_det()[-1]+20e6
+        if np.any(detuning) == None:
+            detuning = np.arange(det_0+20e6, 1500e6, 5e6)
+        # Convert detuning to list of amplitudes
+        Flux_lm_q.sq_amp(0.5)
+        Amps = np.real([ get_Ch_amp_frequency(det, Flux_lm_q, DAC_param='sq_amp')\
+                for  det in detuning ])
+        # Check parking qubits if needed and set the right parking distance.  
+        Parked_qubits = qubit_parks[qubit]
+        # set parking amps for parked qubits. 
+        if not Parked_qubits:
+            print('no parking qubits are defined')
+        else:
+            # Handle frequency of parked qubits
+            for i, q_park in enumerate(Parked_qubits):
+                Q_park = self.find_instrument(q_park)
+                # minimum allowed detuning
+                minimum_detuning = 600e6
+                f_q = qubit_object.freq_qubit()
+                f_q_min = f_q-detuning[-1]
+                # required parked qubit frequency
+                f_q_park = f_q_min-minimum_detuning
+                det_q_park = Q_park.freq_qubit() - f_q_park
+                fl_lm_park = Q_park.instr_LutMan_Flux.get_instr()
+                if det_q_park > 10e6:
+                    park_amp = get_DAC_amp_frequency(det_q_park, fl_lm_park)
+                else:
+                    park_amp = 0
+                fl_lm_park.sq_amp(park_amp)
+                fl_lm_park.sq_length(max_duration)
+                if max_duration > two_qubit_gate_duration:
+                    fl_lm_park.cfg_max_wf_length(max_duration)
+                    fl_lm_park.AWG.get_instr().reset_waveforms_zeros()
+        # prepare for timedomains
+        if max_duration > two_qubit_gate_duration:
+            Flux_lm_q.cfg_max_wf_length(max_duration)
+            Flux_lm_q.AWG.get_instr().reset_waveforms_zeros()
+
+        # self.prepare_readout(qubits=[qubit, 'QC'])
+        # self.ro_acq_digitized(False)
+        if not Parked_qubits:
+            Parked_qubits = []
+        if qubit == 'C':
+            spectator_qubit = 'NW'
+        else:
+            spectator_qubit = 'C'
+        self.prepare_for_timedomain(qubits=[qubit, spectator_qubit], bypass_flux=True)
+        self.prepare_fluxing(qubits=[qubit, spectator_qubit]+Parked_qubits)
+        self.measure_chevron(
+            q0=qubit,
+            q_spec=spectator_qubit,
+            amps=Amps,
+            q_parks=Parked_qubits,
+            lengths= np.linspace(10e-9, max_duration, 6),
+            target_qubit_sequence='ground',
+            waveform_name="square",
+            # buffer_time=40e-9,
+            prepare_for_timedomain=False,
+            disable_metadata=True,
+        )
+        # Reset waveform durations
+        if max_duration > two_qubit_gate_duration:
+            Flux_lm_q.cfg_max_wf_length(two_qubit_gate_duration)
+            Flux_lm_q.AWG.get_instr().reset_waveforms_zeros()
+            if not Parked_qubits:
+                print('no parking qubits are defined')
+            else:
+                for q_park in Parked_qubits:
+                    fl_lm_park = Q_park.instr_LutMan_Flux.get_instr()
+                    fl_lm_park.cfg_max_wf_length(two_qubit_gate_duration)
+                    fl_lm_park.AWG.get_instr().reset_waveforms_zeros()
+        # Run landscape analysis
+        interaction_freqs = { 
+            d : Flux_lm_q.get(f'q_freq_10_{d}')\
+            for d in ['NW', 'NE', 'SW', 'SE']\
+            if 2e9 > Flux_lm_q.get(f'q_freq_10_{d}') > 10e6
+            }
+        isparked = False
+        flux_lm_qpark = None
+        q0 = 'SW'
+        q1 = 'SE'
+        if qubit == q0 or qubit == q1:
+            isparked = True
+            flux_lm_qpark = self.find_instrument(qubit).instr_LutMan_Flux.get_instr()
+        a = ma2.tqg.TLS_landscape_Analysis(
+                    Q_freq = qubit_object.freq_qubit(),
+                    Out_range=Flux_lm_q.cfg_awg_channel_range(),
+                    DAC_amp=Flux_lm_q.sq_amp(),
+                    Poly_coefs=Flux_lm_q.q_polycoeffs_freq_01_det(),
+                    interaction_freqs=interaction_freqs,
+                    flux_lm_qpark = flux_lm_qpark,
+                    isparked = isparked)
+        
+        self.ro_acq_weight_type(old_ro_acq_weight_type)
+        self.ro_acq_averages(old_ro_acq_averages)
+        self.ro_acq_digitized(old_ro_acq_digitized)
+
+        return True
 
     ########################################################
     # other methods
@@ -7279,7 +7419,9 @@ class HAL_Device(HAL_ShimMQ):
         self.set_inspire_acq_type()
         self.prepare_for_inspire()
 
-    def create_s7_calibration_data_dict(self):
+    def create_s7_calibration_data_dict(self,
+                                        generate_json = False):
+        import json
 
         qubit_data = {
             'chip_name': 'Megha',
@@ -7310,7 +7452,7 @@ class HAL_Device(HAL_ShimMQ):
                                 'T2_echo [s]': float(QUBIT.T2_echo()),
                                 'F_init': float(QUBIT.F_init()),
                                 'F_ssro': float(QUBIT.F_ssro()),
-                                'F_RB': float(QUBIT.F_RB())}
+                                'F_1QRB': float(QUBIT.F_RB())}
             
         qubit_data['F_2QRB'] = {
             'Q0-Q2 (NW-W)': float(qubit_objects[0].F_2QRB_SW()),
@@ -7323,15 +7465,58 @@ class HAL_Device(HAL_ShimMQ):
             'Q4-Q6 (E-SE)': float(qubit_objects[4].F_2QRB_SW())
         }
 
-        qubit_data['averages'] = {
-            'T1 [s]': None,
-            'T2_star [s]': None,
-            'T2_echo [s]': None,
-            'F_init': None,
-            'F_ssro': None,
-            'F_RB': None,
-            'F_2QRB': None
+        qubit_data['[average, error]'] = {
+            'T1 [s]': [],
+            'T2_star [s]': [],
+            'T2_echo [s]': [],
+            'F_init [%]': [],
+            'F_ssro [%]': [],
+            'F_1QRB [%]': [],
+            'F_2QRB [%]': []
         }
+
+        values = ["T1 [s]", "T2_echo [s]"]
+        for entry in values:
+            value_list = []
+            for qubit in qubit_list:
+                value_list.append(qubit_data[qubit][entry])
+            qubit_data['[average, error]'][entry].append(np.mean(value_list))
+            qubit_data['[average, error]'][entry].append(np.std(value_list) / np.sqrt(len(value_list)))
+
+        values = ["F_init", "F_ssro", "F_1QRB"]
+        for entry in values:
+            value_list = []
+            for qubit in qubit_list:
+                value_list.append(100*qubit_data[qubit][entry])
+            qubit_data['[average, error]'][f'{entry} [%]'].append(np.mean(value_list))
+            qubit_data['[average, error]'][f'{entry} [%]'].append(np.std(value_list) / np.sqrt(len(value_list)))
+
+        value_list = []
+        for entry in qubit_data["F_2QRB"]:
+            value_list.append(100*qubit_data["F_2QRB"][entry])
+        qubit_data['[average, error]']['F_2QRB [%]'].append(np.mean(value_list))
+        qubit_data['[average, error]']['F_2QRB [%]'].append(np.std(value_list) / np.sqrt(len(value_list)))
+
+        if generate_json == True:
+
+            datadir = r'C:\Experiments\202401_S7_Megha\Data\QI_calibration_data'
+
+            qubit_data['calibration_metadata']['Calibrate RO'] = False
+            qubit_data['calibration_metadata']['Calibrate 1Q gates'] = False
+            qubit_data['calibration_metadata']['Calibrate 2Q gates'] = False
+            qubit_data['calibration_metadata']['Calibrate A vs B landscapes'] = False
+            qubit_data['calibration_metadata']['DAG_RO_duration [s]'] = 0
+            qubit_data['calibration_metadata']['DAG_1Q_duration [s]'] = 0
+            qubit_data['calibration_metadata']['DAG_2Q_duration [s]'] = 0
+            qubit_data['calibration_metadata']['Non-calibrated qubits'] = []
+            qubit_data['calibration_metadata']['Non-calibrated qubit pairs'] = []
+            qubit_data['calibration_metadata']['Failed T1 measurements'] = []
+            qubit_data['calibration_metadata']['Failed T2 echo measurements'] = []
+            qubit_data['calibration_metadata']['Failed SSRO measurements'] = []
+
+            json_file_path = os.path.join(datadir, f"{qubit_data['latest_snapshot_timestamp']}_QI_calibration_data.json")
+            with open(json_file_path, "w") as json_file:
+                json.dump(qubit_data, json_file, indent=3)  # You can adjust the indentation level as needed
 
         return qubit_data
                     
@@ -7344,6 +7529,28 @@ class HAL_Device(HAL_ShimMQ):
         import pycqed.instrument_drivers.meta_instrument.inspire_dependency_graph as IDG
         import json
 
+        datadir = r'C:\Experiments\202401_S7_Megha\Data\QI_calibration_data'
+        datadir_contents = os.listdir(datadir)
+        json_file_path = os.path.join(datadir, datadir_contents[-1])
+        with open(json_file_path, "r") as json_file:
+            qubit_latest_data = json.load(json_file)
+
+        non_cal_qubits = qubit_latest_data['calibration_metadata']['Non-calibrated qubits']
+        non_cal_qubit_pairs = qubit_latest_data['calibration_metadata']['Non-calibrated qubit pairs']
+
+        qubit_parks_dict = {
+            'NW': ['W', 'C'],
+            'NE': ['C', 'E'],
+            'W':  ['SW'],
+            'C': ['SW', 'SE'],
+            'E': ['SE'],
+            'SW': [],
+            'SE': []
+        }
+
+        failed_T1s = []
+        failed_T2s = []
+        failed_SSROs = []
 
         qubit_list = self.qubits()
 
@@ -7351,6 +7558,9 @@ class HAL_Device(HAL_ShimMQ):
             QUBIT = self.find_instrument(qubit)
             QUBIT.ro_acq_averages(2**12)
         self.ro_acq_averages(2**12)
+
+        self.use_online_settings(False)
+        self.prepare_for_timedomain(qubits = qubit_list, bypass_flux = False)
 
         dagRO_duration = 0
         if calilbrate_RO == True:
@@ -7365,8 +7575,8 @@ class HAL_Device(HAL_ShimMQ):
             dagRO_duration = time.time() - initial_time
 
         dag_1Q_duration = 0
-        non_cal_qubits = []
         if calibrate_1Q_gates == True:
+            non_cal_qubits = []
             initial_time = time.time()
             dag_1QPar = IDG.inspire_dep_graph_1Qpar(name='dag_1QPar', device=self)
             dag_1QPar.set_all_node_states('needs calibration')
@@ -7385,11 +7595,16 @@ class HAL_Device(HAL_ShimMQ):
                     except:
                         logging.error(f"Single-qubit calibrations of qubit {qubit} failed!")
                         non_cal_qubits.append(qubit)
+            for failed_qubit in non_cal_qubits:
+                self.measure_TLS_landscape(qubit = failed_qubit,
+                                        qubit_parks = qubit_parks_dict,
+                                        two_qubit_gate_duration = 40e-9
+                                        )
             dag_1Q_duration = time.time() - initial_time
 
         dag2Q_duration = 0
-        non_cal_qubit_pairs = []
         if calibrate_2Q_gates == True:
+            non_cal_qubit_pairs = []
             self.prepare_for_timedomain(qubits = qubit_list, bypass_flux = False)
             initial_time = time.time()
             for qubit_pair in [0, 1, 2, 3, 4, 5, 6, 7]:
@@ -7405,10 +7620,32 @@ class HAL_Device(HAL_ShimMQ):
                     non_cal_qubit_pairs.append(qubit_pair)
             dag2Q_duration = time.time() - initial_time
 
+        for qubit in qubit_list:
+            QUBIT = self.find_instrument(qubit)
+            QUBIT.ro_acq_averages(2**10)
+            try:
+                old_T1_value = QUBIT.T1()
+                QUBIT.measure_T1(disable_metadata = True)
+            except:
+                failed_T1s.append(qubit)
+                QUBIT.T1(old_T1_value)
+            try:
+                old_T2_echo_value = QUBIT.T2_echo()
+                QUBIT.measure_echo(disable_metadata = True)
+            except:
+                failed_T2s.append(qubit)
+                QUBIT.T2_echo(old_T2_echo_value)
+            try:
+                self.measure_ssro_single_qubit(qubits = [qubit], q_target = qubit, initialize=True, disable_metadata = True)
+            except:
+                failed_SSROs.append(qubit)
+            QUBIT.ro_acq_averages(2**12)
+            
         self.prepare_for_inspire() # in order to obtain latest system_snapshot timestamp
                                    # this ensures that even if all calibrations fail
                                    # we will still have the timestamp with the latest
                                    # parameters of the processor
+
         qubit_data = self.create_s7_calibration_data_dict()
 
         qubit_data['calibration_metadata']['Calibrate RO'] = calilbrate_RO
@@ -7420,6 +7657,9 @@ class HAL_Device(HAL_ShimMQ):
         qubit_data['calibration_metadata']['DAG_2Q_duration [s]'] = dag2Q_duration
         qubit_data['calibration_metadata']['Non-calibrated qubits'] = non_cal_qubits
         qubit_data['calibration_metadata']['Non-calibrated qubit pairs'] = non_cal_qubit_pairs
+        qubit_data['calibration_metadata']['Failed T1 measurements'] = failed_T1s
+        qubit_data['calibration_metadata']['Failed T2 echo measurements'] = failed_T2s
+        qubit_data['calibration_metadata']['Failed SSRO measurements'] = failed_SSROs
 
         json_file_path = os.path.join(datadir, f"{qubit_data['latest_snapshot_timestamp']}_QI_calibration_data.json")
         with open(json_file_path, "w") as json_file:
@@ -7471,3 +7711,35 @@ def calculate_output_voltage_from_detuning(qubit_detuning, qubit_flux_lm):
     result = minimize(cost_function, x0=0.2, method='nelder-mead')
     
     return result.x[0]
+
+def get_Ch_amp_frequency(freq, flux_lutman, DAC_param='sq_amp'):
+	'''
+	Function to calculate channel gain corresponding 
+	to frequency detuning.
+	'''
+	poly_coefs = flux_lutman.q_polycoeffs_freq_01_det()
+	out_range = flux_lutman.cfg_awg_channel_range()
+	dac_amp = flux_lutman.get(DAC_param)
+	poly_func = np.poly1d(poly_coefs)
+	out_volt = max((poly_func-freq).roots)
+	ch_amp = out_volt/(dac_amp*out_range/2)
+	return np.real(ch_amp)
+
+def get_DAC_amp_frequency(freq, flux_lutman):
+	'''
+	Function to calculate DAC amp corresponding 
+	to frequency detuning.
+	'''
+	poly_coefs = flux_lutman.q_polycoeffs_freq_01_det()
+	out_range = flux_lutman.cfg_awg_channel_range()
+	ch_amp = flux_lutman.cfg_awg_channel_amplitude()
+	poly_func = np.poly1d(poly_coefs)
+	out_volt = max((poly_func-freq).roots)
+	sq_amp = out_volt/(ch_amp*out_range/2)
+	# Safe check in case amplitude exceeds maximum
+	if sq_amp>1:
+		print(f'WARNING had to increase gain of {flux_lutman.name} to {ch_amp}!')
+		flux_lutman.cfg_awg_channel_amplitude(ch_amp*1.5)
+		# Can't believe Im actually using recursion!!!
+		sq_amp = get_DAC_amp_frequency(freq, flux_lutman)
+	return np.real(sq_amp)
