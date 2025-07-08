@@ -216,6 +216,7 @@
         "prep_z %0": ["prepz %0", "i %0"], // added post identity, LDC 22/10/13.
         "prep_y %0": ["prepz %0", "rx270 %0"],
         "prep_x %0": ["prepz %0", "ry90 %0"],
+        "reset %0": ["prep_z %0"],
         // "prepy %0": ["rx270 %0"],
         // "prepx %0": ["ry90 %0"],
 

@@ -9078,10 +9078,10 @@ class DoubleFrequency(TD_Analysis):
             phi_guess = np.angle(coeff[[0,2]])
 
         Double_Cos_Model.set_param_hint(
-            'tau_1', value=tau_guess[0], vary=True, min=0, max=6*tau_guess[0])
+            'tau_1', value=2*tau_guess[0], vary=True, min=0, max=4*tau_guess[0])
         Double_Cos_Model.set_param_hint(
             'freq_1', value=freq_guess[0], min=0)
-        Double_Cos_Model.set_param_hint('phase_1', value=phi_guess[0])
+        Double_Cos_Model.set_param_hint('phase_1', value=phi_guess[0]) # RDC changed it on 2025/05/08, It used to be phi_guess[0]
         Double_Cos_Model.set_param_hint('osc_offset', value=np.mean(measured_values), min=0, max=1)
         if (only_one_peak):
             Double_Cos_Model.set_param_hint(
@@ -9090,16 +9090,16 @@ class DoubleFrequency(TD_Analysis):
                 'freq_2', value=0, vary=False)
             Double_Cos_Model.set_param_hint('phase_2', value=0, vary=False)
             Double_Cos_Model.set_param_hint(
-                'amp_1', value=amp_guess[0], min=0.05, max=0.8, vary=True)
+                'amp_1', value=2*amp_guess[0], min=0.05, max=0.8, vary=True)
             Double_Cos_Model.set_param_hint(
                 'amp_2', value=0, vary=False)
 
         else:
             Double_Cos_Model.set_param_hint(
-                'tau_2', value=tau_guess[1], vary=True, min=0, max=6*tau_guess[1])
+                'tau_2', value=2*tau_guess[1], vary=True, min=0, max=4*tau_guess[1])
             Double_Cos_Model.set_param_hint(
                 'freq_2', value=freq_guess[1], min=0)
-            Double_Cos_Model.set_param_hint('phase_2', value=phi_guess[1])
+            Double_Cos_Model.set_param_hint('phase_2', value=phi_guess[1])  # RDC changed it on 2025/05/08, It used to be phi_guess[1]
             Double_Cos_Model.set_param_hint(
                 'amp_1', value=amp_guess[0], min=0.05, max=2*amp_guess[0], vary=True)
             Double_Cos_Model.set_param_hint(

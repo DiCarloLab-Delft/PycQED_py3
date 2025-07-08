@@ -2235,20 +2235,33 @@ class VCZ_B_Analysis(ba.BaseDataAnalysis):
         # Calculate cost function to find optimal
         # parameters of amplitude and B amp
         def cost_function(CP, MF,
-                          phase=180,
-                          cp_coef=1, l1_coef=1):
+                        phase=180,
+                        cp_tol=3.0,  # degrees tolerance for phase
+                        mf_max=0.025,  # max acceptable missing fraction error (2.5%)
+                        cp_coef=1.0, l1_coef=0.5, mf_penalty_coef=10.0):
             '''
-            Cost function for minimizing cphase
-            error and leakage simultaneously.
+            Cost function for minimizing conditional phase
+            error and leakage simultaneously, with tighter constraints.
+
+            CP: conditional phase (degrees)
+            MF: missing fraction (0 to 1, i.e., percentage)
             '''
-            A = ((np.abs(CP)-180)/180)**2
-            B = ((MF-np.min(MF))/.5)**2
-            C = (np.mean(MF-np.min(MF), axis=0)/.5)**2
-            return cp_coef*A + l1_coef*(B+C)
+            # Strongly penalize CP deviation beyond ±2 degrees
+            A = ((CP - phase) / cp_tol)**2
+
+            # Normalize MF cost based on acceptable range
+            B = ((MF - np.min(MF)) / mf_max)**2
+            C = (np.mean(MF - np.min(MF), axis=0) / mf_max)**2
+
+            # Extra penalty for MF exceeding acceptable threshold
+            MF_penalty = np.where(MF > mf_max, (MF - mf_max)**2, 0)
+
+            return cp_coef*A + l1_coef*(B + C) + mf_penalty_coef * MF_penalty
+
         for i, q0 in enumerate(self.Q0):
             CP = self.raw_data_dict['data'][:,2*i+2].reshape(ny, nx)
             MF = self.raw_data_dict['data'][:,2*i+3].reshape(ny, nx)
-            CF = cost_function(CP, MF, l1_coef=self.l1_coef)
+            CF = cost_function(CP, MF)
             # Find minimum of cost function
             idxs_min = np.unravel_index(np.argmin(CF), CF.shape)
             A_min, B_min = Amps_list[i][idxs_min[1]], Bamps[idxs_min[0]]

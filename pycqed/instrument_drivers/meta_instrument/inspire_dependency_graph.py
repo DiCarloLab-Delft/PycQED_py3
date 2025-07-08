@@ -683,36 +683,18 @@ class inspire_dep_graph_2Q(AutoDepGraph_DAG):
 
         if CZindex==0:
           pair=['NW', 'W', 'C']
-          flux_lm_C = self.device.find_instrument('flux_lm_C')
-          flux_lm_C.cfg_awg_channel_amplitude(0.57198) # 1 GHz detuning
-          self.device.prepare_for_timedomain(qubits = ['C'], bypass_flux = False)
         elif CZindex==1:
           pair=['NW', 'C', 'W']
-          flux_lm_W = self.device.find_instrument('flux_lm_W')
-          flux_lm_W.cfg_awg_channel_amplitude(0.19792) # 100 MHz detuning
-          self.device.prepare_for_timedomain(qubits = ['W'], bypass_flux = False)
         elif CZindex==2:
           pair=['NE', 'C', 'E']
-          flux_lm_E = self.device.find_instrument('flux_lm_E')
-          flux_lm_E.cfg_awg_channel_amplitude(0.29700) # 262 MHz detuning
-          self.device.prepare_for_timedomain(qubits = ['E'], bypass_flux = False)
         elif CZindex==3:
           pair=['NE', 'E', 'C']
-          flux_lm_C = self.device.find_instrument('flux_lm_C')
-          flux_lm_C.cfg_awg_channel_amplitude(0.57198) # 1 GHz detuning
-          self.device.prepare_for_timedomain(qubits = ['C'], bypass_flux = False)
         elif CZindex==4:
           pair=['W', 'SW']
         elif CZindex==5:
           pair=['C', 'SW', 'SE']
-          flux_lm_SE = self.device.find_instrument('flux_lm_SE')
-          flux_lm_SE.cfg_awg_channel_amplitude(0.57990) # 800 MHz detuning
-          self.device.prepare_for_timedomain(qubits = ['SE'], bypass_flux = False)
         elif CZindex==6:
           pair=['C', 'SE', 'SW']
-          flux_lm_SW = self.device.find_instrument('flux_lm_SW')
-          flux_lm_SW.cfg_awg_channel_amplitude(0.60109) # 780 MHz detuning
-          self.device.prepare_for_timedomain(qubits = ['SW'], bypass_flux = False)
         elif CZindex==7:
           pair=['E', 'SE']
 
@@ -757,15 +739,15 @@ class inspire_dep_graph_2Q(AutoDepGraph_DAG):
           self.add_node('SNZ',
                             calibrate_function=self.device.name + '.measure_vcz_A_B_landscape',
                             calibrate_function_args={ 'Q0': [pair[0]], 'Q1': [pair[1]], 'update_flux_params': True,
-                                                      'A_points': 11, 'A_ranges': [(.98*center, 1.02*center)], 
-                                                      'B_amps': np.linspace(0, 1, 11),
+                                                      'A_points': 15, 'A_ranges': [(.98*center, 1.02*center)], 
+                                                      'B_amps': np.linspace(0, 1, 11), # Perhaps 15x15 points instead of 11x11?
                                                       'Q_parks': q_parks})
         else:
           self.add_node('SNZ',
                             calibrate_function=self.device.name + '.measure_vcz_A_B_landscape',
                             calibrate_function_args={ 'Q0': [pair[0]], 'Q1': [pair[1]], 'update_flux_params': True,
-                                                      'A_points': 11, 'A_ranges': [(.995*center, 1.005*center)], 
-                                                      'B_amps': np.linspace(0, 1, 11),
+                                                      'A_points': 15, 'A_ranges': [(.995*center, 1.005*center)], 
+                                                      'B_amps': np.linspace(0, 1, 11), # Perhaps 15x15 points instead of 11x11?
                                                       'Q_parks': q_parks})
         # Assess two-qubit phase
         self.add_node('TQP',

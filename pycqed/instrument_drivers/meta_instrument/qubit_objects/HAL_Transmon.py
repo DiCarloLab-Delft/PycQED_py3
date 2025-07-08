@@ -3036,6 +3036,7 @@ class HAL_Transmon(HAL_ShimSQ):
         self,
         amplitude: float = None,
         times: list = np.arange(20e-9, 40e-9, 1/2.4e9),
+        parked_qubits: list = None,
         wait_time_flux: int = 0,
         disable_metadata: bool = False,
         analyze: bool = True,
@@ -3104,6 +3105,7 @@ class HAL_Transmon(HAL_ShimSQ):
         self,
         Times: list = np.arange(20e-9, 40e-9, 1/2.4e9),
         Amplitudes: list = [-0.4, -0.35, -0.3, 0.3, 0.35, 0.4],
+        parked_qubits: list = None,
         update: bool = True,
         disable_metadata: bool = False,
         prepare_for_timedomain: bool = True):
@@ -3132,6 +3134,7 @@ class HAL_Transmon(HAL_ShimSQ):
         def wrapper():
             a = self.measure_flux_frequency_timedomain(
                 times = Times,
+                parked_qubits = parked_qubits,
                 disable_metadata=True,
                 prepare_for_timedomain=False)
             return {'detuning':a.proc_data_dict['detuning']}

@@ -6235,6 +6235,7 @@ class HAL_Device(HAL_ShimMQ):
             pair,
             eps=5,          # error threshold for single-qubit phase, in degrees
             numpasses=5,     # number of attemps to reach threshold
+            prepare_for_timedomain = True,
             disable_metadata = False
             ):
         '''
@@ -6246,7 +6247,8 @@ class HAL_Device(HAL_ShimMQ):
         '''
 
         self.ro_acq_weight_type('optimal')
-        self.prepare_for_timedomain(qubits = [pair[0], pair[1]], bypass_flux = False)
+        if prepare_for_timedomain == True:
+            self.prepare_for_timedomain(qubits = [pair[0], pair[1]], bypass_flux = False)
 
         # get qubit object and the micrwoave lutman for qO
         q2 = self.find_instrument(pair[2])
@@ -6258,7 +6260,7 @@ class HAL_Device(HAL_ShimMQ):
 
             # run the conditional oscillation experiment
             a = self.measure_conditional_oscillation(q0=pair[0], q1=pair[1], q2=pair[2], parked_qubit_seq='ramsey',
-                                                     disable_metadata = disable_metadata)   
+                                                     prepare_for_timedomain = prepare_for_timedomain, disable_metadata = disable_metadata)   
             # get single-qubit phase update
             dphi0 = a.proc_data_dict['quantities_of_interest']['park_phase_off'].nominal_value
             dphi0 = np.mod(dphi0,360) # ensure modulo 360 degrees.
@@ -6286,10 +6288,11 @@ class HAL_Device(HAL_ShimMQ):
             qubit_pair: list,
             parked_qubit: str,
             parked_qubit_detunings: list, # in [Hz]
+            prepare_for_timedomain = True,
             disable_metadata = True
     ):
         """
-        This routine sweeps the cfg_awg_channel_amplitude() of the parked qubit to match the
+        This routine sweeps the sq_amp() of the parked qubit to match the
         selected values of parked_qubit_detunings and measures the parked qubit conditional
         oscillation, as well as the missing fraction of the qubit_pair. The goal is to
         find an optimal detuning frequency for the parked qubit which minimizes both
@@ -6315,14 +6318,14 @@ class HAL_Device(HAL_ShimMQ):
             os.makedirs(data_folder_dir, exist_ok=False)
 
         self.ro_acq_weight_type('optimal')
-        calibrate_parking_phase = self.calibrate_parking_phase_GBT(pair = [qubit_pair[0], qubit_pair[1], parked_qubit],
+        calibrate_parking_phase = self.calibrate_parking_phase_GBT(pair = [qubit_pair[1], qubit_pair[0], parked_qubit],
                                                                    eps = 5)
         if calibrate_parking_phase == False:
             raise ValueError("Parking qubit phase must be calibrated before running this routine.")
         
         q2 = self.find_instrument(parked_qubit)
         flux_lm_q2 = q2.instr_LutMan_Flux.get_instr()
-        initial_awg_ch_amp = flux_lm_q2.cfg_awg_channel_amplitude()
+        initial_park_amp = flux_lm_q2.park_amp()
 
         dphi_values = []
         missing_fraction_values = []
@@ -6333,14 +6336,15 @@ class HAL_Device(HAL_ShimMQ):
 
         for detuning in parked_qubit_detunings:
 
-            output_voltage = calculate_output_voltage_from_detuning(detuning, flux_lm_q2)
-            awg_channel_amplitude = calculate_amplitude_from_output_voltage(output_voltage, 0.25, flux_lm_q2)
-            flux_lm_q2.cfg_awg_channel_amplitude(awg_channel_amplitude)
+            park_amp = get_DAC_amp_frequency(detuning, flux_lm_q2)
+            flux_lm_q2.park_amp(park_amp)
+            flux_lm_q2.AWG.get_instr().reset_waveforms_zeros()
+
             self.prepare_fluxing(qubits = [parked_qubit])
 
             # run the conditional oscillation experiment
-            a = self.measure_conditional_oscillation(q0=qubit_pair[0], q1=qubit_pair[1], q2=parked_qubit, parked_qubit_seq='ramsey',
-                                                    disable_metadata = disable_metadata)
+            a = self.measure_conditional_oscillation(q0=qubit_pair[1], q1=qubit_pair[0], q2=parked_qubit, parked_qubit_seq='ramsey',
+                                                    prepare_for_timedomain = prepare_for_timedomain, disable_metadata = disable_metadata)
                
             phi_off = a.proc_data_dict['quantities_of_interest']['park_phase_off'].nominal_value
             phi_on = a.proc_data_dict['quantities_of_interest']['park_phase_on'].nominal_value
@@ -6351,7 +6355,8 @@ class HAL_Device(HAL_ShimMQ):
             dphi_values.append(dphi_value)
             missing_fraction_values.append(missing_fraction)
 
-        flux_lm_q2.cfg_awg_channel_amplitude(initial_awg_ch_amp)
+        flux_lm_q2.park_amp(initial_park_amp)
+        flux_lm_q2.AWG.get_instr().reset_waveforms_zeros()
         self.prepare_fluxing(qubits = [parked_qubit])    
 
         timestamp = MC.run_history.raw_value[-1]['begintime']
@@ -6842,7 +6847,7 @@ class HAL_Device(HAL_ShimMQ):
                     for d in ['NW', 'NE', 'SW', 'SE']:
                         Amps_11_02[i][d] *= Old_gains[i]/Opt_gains[i]
                     Amps_11_02[i][directions[i][0]] = 0.5
-                    Amps_park[i] *= Old_gains[i]/Opt_gains[i]
+                    # Amps_park[i] *= Old_gains[i]/Opt_gains[i]
                 # If new channel gain is lower than old gain, then choose
                 # dac value for measured gate based on old gain
                 else:
@@ -6852,7 +6857,7 @@ class HAL_Device(HAL_ShimMQ):
                 # Set flux_lutman amplitudes
                 _set_amps_11_02(Amps_11_02[i], Flux_lm_0[i])
                 Flux_lm_0[i].set(f'vcz_amp_fine_{directions[i][0]}', Opt_Bvals[i])
-                Flux_lm_0[i].set(f'park_amp', Amps_park[i])
+                # Flux_lm_0[i].set(f'park_amp', Amps_park[i])
         return a.qoi
 
     def measure_parity_check_ramsey(
@@ -7607,7 +7612,7 @@ class HAL_Device(HAL_ShimMQ):
             non_cal_qubit_pairs = []
             self.prepare_for_timedomain(qubits = qubit_list, bypass_flux = False)
             initial_time = time.time()
-            for qubit_pair in [0, 1, 2, 3, 4, 5, 6, 7]:
+            for qubit_pair in [4, 7, 5, 6, 0, 1, 2, 3]:
                 dag2Q = IDG.inspire_dep_graph_2Q(name='dag2Q', device=self, CZindex = qubit_pair)
                 dag2Q.set_all_node_states('needs calibration')
                 if calibrate_A_vs_B == False:
