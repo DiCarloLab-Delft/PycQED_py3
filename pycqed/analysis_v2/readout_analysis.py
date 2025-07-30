@@ -29,7 +29,775 @@ from pycqed.analysis_v2.tools.plotting import scatter_pnts_overlay
 import pycqed.analysis.tools.data_manipulation as dm_tools
 from pycqed.utilities.general import int2base
 from pycqed.utilities.general import format_value_string
+from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
+import pycqed.measurement.hdf5_data as h5d
+import os
+# import xarray as xr
 
+# ADD from pagani detached. RDC 16-02-2023
+
+def create_xr_data(proc_data_dict,qubit,timestamp):
+
+    NUM_STATES = 3
+
+    calibration_data = np.array([[proc_data_dict[f"{comp}{state}"] for comp in ("I", "Q")] for state in range(NUM_STATES)])
+
+    arr_data = []
+    for state_ind in range(NUM_STATES):
+        state_data = []
+        for meas_ind in range(1, NUM_STATES + 1):
+            ind = NUM_STATES*state_ind + meas_ind
+            meas_data = [proc_data_dict[f"{comp}M{ind}"] for comp in ("I", "Q")]
+            state_data.append(meas_data)
+        arr_data.append(state_data)
+
+    butterfly_data = np.array(arr_data)
+
+    NUM_STATES, NUM_MEAS_INDS, NUM_COMPS, NUM_SHOTS = butterfly_data.shape
+
+    assert NUM_COMPS == 2
+
+    STATES = list(range(0, NUM_STATES))
+    MEAS_INDS = list(range(1, NUM_MEAS_INDS + 1))
+    SHOTS = list(range(1, NUM_SHOTS + 1))
+
+    exp_dataset = xr.Dataset(
+        data_vars = dict(
+            calibration = (["state", "comp", "shot"], calibration_data),
+            characterization = (["state", "meas_ind", "comp", "shot"], butterfly_data),
+        ),
+        coords = dict(
+            state = STATES,
+            meas_ind = MEAS_INDS,
+            comp = ["in-phase", "quadrature"],
+            shot = SHOTS,
+            qubit = qubit,
+        ),
+        attrs = dict(
+            description = "Qutrit measurement butterfly data.",
+            timestamp = timestamp,
+        )
+    )
+
+    return exp_dataset
+
+def QND_qutrit_anaylsis(NUM_STATES,
+                        NUM_OUTCOMES,
+                        STATES,
+                        OUTCOMES,
+                        char_data,
+                        cal_data,
+                        fid,
+                        accuracy,
+                        timestamp,
+                        classifier):
+
+    data = char_data.stack(stacked_dim = ("state", "meas_ind", "shot"))
+    data = data.transpose("stacked_dim", "comp")
+
+    predictions = classifier.predict(data)
+    outcome_vec = xr.DataArray(
+        data = predictions,
+        dims = ["stacked_dim"],
+        coords = dict(stacked_dim = data.stacked_dim)
+    )
+
+    digital_char_data = outcome_vec.unstack()
+    matrix = np.zeros((NUM_STATES, NUM_OUTCOMES, NUM_OUTCOMES), dtype=float)
+
+    for state in STATES:
+        meas_arr = digital_char_data.sel(state=state)
+        postsel_arr = meas_arr.where(meas_arr[0] == 0, drop=True)
+
+        for first_out in OUTCOMES:
+            first_cond = xr.where(postsel_arr[1] == first_out, 1, 0)
+
+            for second_out in OUTCOMES:
+                second_cond = xr.where(postsel_arr[2] == second_out, 1, 0)
+
+                sel_shots = first_cond & second_cond
+                joint_prob = np.mean(sel_shots)
+
+                matrix[state, first_out, second_out] = joint_prob
+
+    joint_probs = xr.DataArray(
+        matrix,
+        dims = ["state", "meas_1", "meas_2"],
+        coords = dict(
+            state = STATES,
+            meas_1 = OUTCOMES,
+            meas_2 = OUTCOMES,
+        )
+    )
+
+    num_constraints = NUM_STATES
+    num_vars = NUM_OUTCOMES * (NUM_STATES ** 2)
+
+    def opt_func(variables, obs_probs, num_states: int) -> float:
+        meas_probs = variables.reshape(num_states, num_states, num_states)
+        probs = np.einsum("ijk, klm -> ijl", meas_probs, meas_probs)
+        return np.linalg.norm(np.ravel(probs - obs_probs))
+
+    cons_mat = np.zeros((num_constraints, num_vars), dtype=int)
+    num_cons_vars = int(num_vars / num_constraints)
+    for init_state in range(NUM_STATES):
+        var_ind = init_state * num_cons_vars
+        cons_mat[init_state, var_ind : var_ind + num_cons_vars] = 1
+
+    constraints = {"type": "eq", "fun": lambda variables: cons_mat @ variables - 1}
+    bounds = opt.Bounds(0, 1)
+
+    ideal_probs = np.zeros((NUM_STATES, NUM_OUTCOMES, NUM_OUTCOMES), dtype=float)
+    for state in range(NUM_STATES):
+        ideal_probs[state, state, state] = 1
+    init_vec = np.ravel(ideal_probs)
+
+    result = opt.basinhopping(
+        opt_func,
+        init_vec,
+        niter=500,
+        minimizer_kwargs=dict(
+            args=(joint_probs.data, NUM_STATES),
+            bounds=bounds,
+            constraints=constraints,
+            method="SLSQP",
+            tol=1e-12,
+            options=dict(
+                maxiter=10000,
+            )
+        )
+    )
+    # if not result.success:
+    #     raise ValueError("Unsuccessful optimization, please check parameters and tolerance.")
+    res_data = result.x.reshape((NUM_STATES, NUM_OUTCOMES, NUM_STATES))
+
+    meas_probs = xr.DataArray(
+        res_data,
+        dims = ["input_state", "outcome", "output_state"],
+        coords = dict(
+            input_state = STATES,
+            outcome = OUTCOMES,
+            output_state = STATES,
+        )
+    )
+
+    pred_joint_probs = np.einsum("ijk, klm -> ijl", meas_probs, meas_probs)
+
+    true_vals = np.ravel(joint_probs)
+    pred_vals = np.ravel(pred_joint_probs)
+
+    ms_error = mean_squared_error(true_vals, pred_vals)
+    rms_error = np.sqrt(ms_error)
+    ma_error = mean_absolute_error(true_vals, pred_vals)
+
+    print(f"RMS error of the optimised solution: {rms_error}")
+    print(f"MA error of the optimised solution: {ma_error}")
+
+    num_vars = 3 * (NUM_STATES ** 2)
+    num_constraints = 3 * NUM_STATES
+
+    def opt_func(
+        variables,
+        obs_probs,
+        num_states: int,
+    ) -> float:
+        pre_mat, ro_mat, post_mat = variables.reshape(3, num_states, num_states)
+        probs = np.einsum("ih, hm, ho -> imo", pre_mat, ro_mat, post_mat)
+        return np.linalg.norm(probs - obs_probs)
+
+    cons_mat = np.zeros((num_constraints, num_vars), dtype=int)
+    for op_ind in range(3):
+        for init_state in range(NUM_STATES):
+            cons_ind = op_ind*NUM_STATES + init_state
+            var_ind = (op_ind*NUM_STATES + init_state)*NUM_STATES
+            cons_mat[cons_ind, var_ind : var_ind + NUM_STATES] = 1
+
+    ideal_probs = np.tile(np.eye(NUM_STATES), (3, 1))
+    init_vec = np.ravel(ideal_probs)
+
+    constraints = {"type": "eq", "fun": lambda variables: cons_mat @ variables - 1}
+    bounds = opt.Bounds(0, 1, keep_feasible=True)
+
+    result = opt.basinhopping(
+        opt_func,
+        init_vec,
+        minimizer_kwargs = dict(
+            args = (meas_probs.data, NUM_STATES),
+            bounds = bounds,
+            constraints = constraints,
+            method = "SLSQP",
+            tol = 1e-12,
+            options = dict(
+                maxiter = 10000,
+            )
+        ),
+        niter=500
+    )
+
+
+    # if not result.success:
+    #     raise ValueError("Unsuccessful optimization, please check parameters and tolerance.")
+
+    pre_trans, ass_errors, post_trans = result.x.reshape((3, NUM_STATES, NUM_STATES))
+
+    pred_meas_probs = np.einsum("ih, hm, ho -> imo", pre_trans, ass_errors, post_trans)
+
+    true_vals = np.ravel(meas_probs)
+    pred_vals = np.ravel(pred_meas_probs)
+
+    ms_error = mean_squared_error(true_vals, pred_vals)
+    rms_error = np.sqrt(ms_error)
+    ma_error = mean_absolute_error(true_vals, pred_vals)
+
+    print(f"RMS error of the optimised solution: {rms_error}")
+    print(f"MA error of the optimised solution: {ma_error}")
+
+    QND_state = {}
+    for state in STATES:
+        state_qnd = np.sum(meas_probs.data[state,:, state])
+        QND_state[f'{state}'] = state_qnd
+
+    meas_qnd = np.mean(np.diag(meas_probs.sum(axis=1)))
+    meas_qnd
+
+    fit_res = {}
+    fit_res['butter_prob'] = pred_meas_probs
+    fit_res['mean_QND'] = meas_qnd
+    fit_res['state_qnd'] = QND_state
+    fit_res['ass_errors'] = ass_errors
+    fit_res['qutrit_fidelity'] = accuracy*100
+    fit_res['fidelity'] = fid
+    fit_res['timestamp'] = timestamp
+
+    # Meas leak rate
+    L1 = 100*np.sum(fit_res['butter_prob'][:2,:,2])/2
+
+    # Meas seepage rate
+    s = 100*np.sum(fit_res['butter_prob'][2,:,:2])
+
+    fit_res['L1'] = L1
+    fit_res['seepage'] = s
+
+    return fit_res
+
+class measurement_butterfly_analysis(ba.BaseDataAnalysis):
+    """
+    This analysis extracts measurement butter fly
+    """
+    def __init__(self,
+                 qubit:str,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 f_state: bool = False,
+                 cycle : int = 6,
+                 options_dict: dict = None,
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+
+        self.qubit = qubit
+        self.f_state = f_state
+
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+            data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+
+        if self.f_state:
+            _cycle = 12
+            I0, Q0 = self.raw_data_dict['data'][:,1][9::_cycle], self.raw_data_dict['data'][:,2][9::_cycle]
+            I1, Q1 = self.raw_data_dict['data'][:,1][10::_cycle], self.raw_data_dict['data'][:,2][10::_cycle]
+            I2, Q2 = self.raw_data_dict['data'][:,1][11::_cycle], self.raw_data_dict['data'][:,2][11::_cycle]
+        else:
+            _cycle = 8
+            I0, Q0 = self.raw_data_dict['data'][:,1][6::_cycle], self.raw_data_dict['data'][:,2][6::_cycle]
+            I1, Q1 = self.raw_data_dict['data'][:,1][7::_cycle], self.raw_data_dict['data'][:,2][7::_cycle]
+        # Measurement
+        IM1, QM1 = self.raw_data_dict['data'][0::_cycle,1], self.raw_data_dict['data'][0::_cycle,2]
+        IM2, QM2 = self.raw_data_dict['data'][1::_cycle,1], self.raw_data_dict['data'][1::_cycle,2]
+        IM3, QM3 = self.raw_data_dict['data'][2::_cycle,1], self.raw_data_dict['data'][2::_cycle,2]
+        IM4, QM4 = self.raw_data_dict['data'][3::_cycle,1], self.raw_data_dict['data'][3::_cycle,2]
+        IM5, QM5 = self.raw_data_dict['data'][4::_cycle,1], self.raw_data_dict['data'][4::_cycle,2]
+        IM6, QM6 = self.raw_data_dict['data'][5::_cycle,1], self.raw_data_dict['data'][5::_cycle,2]
+        # Rotate data
+        center_0 = np.array([np.mean(I0), np.mean(Q0)])
+        center_1 = np.array([np.mean(I1), np.mean(Q1)])
+        if self.f_state:
+            IM7, QM7 = self.raw_data_dict['data'][6::_cycle,1], self.raw_data_dict['data'][6::_cycle,2]
+            IM8, QM8 = self.raw_data_dict['data'][7::_cycle,1], self.raw_data_dict['data'][7::_cycle,2]
+            IM9, QM9 = self.raw_data_dict['data'][8::_cycle,1], self.raw_data_dict['data'][8::_cycle,2]
+            center_2 = np.array([np.mean(I2), np.mean(Q2)])
+        def rotate_and_center_data(I, Q, vec0, vec1):
+            vector = vec1-vec0
+            angle = np.arctan(vector[1]/vector[0])
+            rot_matrix = np.array([[ np.cos(-angle),-np.sin(-angle)],
+                                   [ np.sin(-angle), np.cos(-angle)]])
+            # Subtract mean
+            proc = np.array((I-(vec0+vec1)[0]/2, Q-(vec0+vec1)[1]/2))
+            # Rotate theta
+            proc = np.dot(rot_matrix, proc)
+            return proc
+        # proc cal points
+        I0_proc, Q0_proc = rotate_and_center_data(I0, Q0, center_0, center_1)
+        I1_proc, Q1_proc = rotate_and_center_data(I1, Q1, center_0, center_1)
+        # proc M
+        IM1_proc, QM1_proc = rotate_and_center_data(IM1, QM1, center_0, center_1)
+        IM2_proc, QM2_proc = rotate_and_center_data(IM2, QM2, center_0, center_1)
+        IM3_proc, QM3_proc = rotate_and_center_data(IM3, QM3, center_0, center_1)
+        IM4_proc, QM4_proc = rotate_and_center_data(IM4, QM4, center_0, center_1)
+        IM5_proc, QM5_proc = rotate_and_center_data(IM5, QM5, center_0, center_1)
+        IM6_proc, QM6_proc = rotate_and_center_data(IM6, QM6, center_0, center_1)
+        if np.mean(I0_proc) > np.mean(I1_proc):
+            I0_proc *= -1
+            I1_proc *= -1
+            IM1_proc *= -1
+            IM2_proc *= -1
+            IM3_proc *= -1
+            IM4_proc *= -1
+            IM5_proc *= -1
+            IM6_proc *= -1
+        # Calculate optimal threshold
+        ubins_A_0, ucounts_A_0 = np.unique(I0_proc, return_counts=True)
+        ubins_A_1, ucounts_A_1 = np.unique(I1_proc, return_counts=True)
+        ucumsum_A_0 = np.cumsum(ucounts_A_0)
+        ucumsum_A_1 = np.cumsum(ucounts_A_1)
+        # merge |0> and |1> shot bins
+        all_bins_A = np.unique(np.sort(np.concatenate((ubins_A_0, ubins_A_1))))
+        # interpolate cumsum for all bins
+        int_cumsum_A_0 = np.interp(x=all_bins_A, xp=ubins_A_0, fp=ucumsum_A_0, left=0)
+        int_cumsum_A_1 = np.interp(x=all_bins_A, xp=ubins_A_1, fp=ucumsum_A_1, left=0)
+        norm_cumsum_A_0 = int_cumsum_A_0/np.max(int_cumsum_A_0)
+        norm_cumsum_A_1 = int_cumsum_A_1/np.max(int_cumsum_A_1)
+        # Calculating threshold
+        F_vs_th = (1-(1-abs(norm_cumsum_A_0-norm_cumsum_A_1))/2)
+        opt_idxs = np.argwhere(F_vs_th == np.amax(F_vs_th))
+        opt_idx = int(round(np.average(opt_idxs)))
+        threshold = all_bins_A[opt_idx]
+        # fidlity calculation from cal point
+        P0_dig = np.array([ 0 if s<threshold else 1 for s in I0_proc ])
+        P1_dig = np.array([ 0 if s<threshold else 1 for s in I1_proc ])
+        M1_dig = np.array([ 0 if s<threshold else 1 for s in IM1_proc ])
+        M2_dig = np.array([ 0 if s<threshold else 1 for s in IM2_proc ])
+        M3_dig = np.array([ 0 if s<threshold else 1 for s in IM3_proc ])
+        M4_dig = np.array([ 0 if s<threshold else 1 for s in IM4_proc ])
+        M5_dig = np.array([ 0 if s<threshold else 1 for s in IM5_proc ])
+        M6_dig = np.array([ 0 if s<threshold else 1 for s in IM6_proc ])
+        Fidelity = (np.mean(1-P0_dig) + np.mean(P1_dig))/2
+        # postselected init for zero
+        I_mask = np.ones(len(IM1_proc))
+        Q_mask = np.ones(len(QM1_proc))
+        IM1_init =   np.array([ +1 if shot < threshold else np.nan for shot in IM1_proc ], dtype=float)
+        QM1_init =   np.array([ +1 if shot < threshold else np.nan for shot in QM1_proc ], dtype=float)
+        IM2_dig_ps = np.array([ +1 if shot < threshold else -1 for shot in IM2_proc ], dtype=float)
+        QM2_dig_ps = np.array([ +1 if shot < threshold else -1 for shot in QM2_proc ], dtype=float)
+        IM3_dig_ps = np.array([ +1 if shot < threshold else -1 for shot in IM3_proc ], dtype=float)
+        QM3_dig_ps = np.array([ +1 if shot < threshold else -1 for shot in QM3_proc ], dtype=float)
+        I_mask *= IM1_init
+        Q_mask *= QM1_init
+        IM2_dig_ps *= I_mask
+        QM2_dig_ps *= Q_mask
+        IM3_dig_ps *= I_mask
+        QM3_dig_ps *= Q_mask
+        fraction_discarded_I = np.sum(np.isnan(I_mask))/len(I_mask)
+        fraction_discarded_Q = np.sum(np.isnan(Q_mask))/len(Q_mask)
+        # # postselectted init for 1
+        I1_mask = np.ones(len(IM4_proc))
+        Q1_mask = np.ones(len(QM4_proc))
+        IM4_init =  np.array([ +1 if shot < threshold else np.nan for shot in IM4_proc ], dtype=float)
+        QM4_init =  np.array([ +1 if shot < threshold else np.nan for shot in QM4_proc ], dtype=float)
+        IM5_dig_ps = np.array([ +1 if shot < threshold else -1 for shot in IM5_proc ], dtype=float)
+        QM5_dig_ps = np.array([ +1 if shot < threshold else -1 for shot in QM5_proc ], dtype=float)
+        IM6_dig_ps = np.array([ +1 if shot < threshold else -1 for shot in IM6_proc ], dtype=float)
+        QM6_dig_ps = np.array([ +1 if shot < threshold else -1 for shot in QM6_proc ], dtype=float)
+        I1_mask *= IM4_init
+        Q1_mask *= QM4_init
+        IM5_dig_ps *= I1_mask
+        QM5_dig_ps *= Q1_mask
+        IM6_dig_ps *= I1_mask
+        QM6_dig_ps *= Q1_mask
+        fraction_discarded_I1 = np.sum(np.isnan(I1_mask))/len(I1_mask)
+        fraction_discarded_Q1 = np.sum(np.isnan(Q1_mask))/len(Q1_mask)
+        # digitize data
+        M1_dig_ps = (1-IM1_init)/2 # turn into binary
+        M2_dig_ps = (1-IM2_dig_ps)/2 # turn into binary
+        M3_dig_ps = (1-IM3_dig_ps)/2 # turn into binary
+        M4_dig_ps = (1-IM4_init)/2 # turn into binary
+        M5_dig_ps = (1-IM5_dig_ps)/2 # turn into binary
+        M6_dig_ps = (1-IM6_dig_ps)/2 # turn into binary
+        #############
+        ## p for prep 0
+        #############
+        p0_init_prep0 = 1-np.nanmean(M1_dig_ps)
+        p1_init_prep0 = np.nanmean(M1_dig_ps)
+        p0_M1_prep0 = 1-np.nanmean(M2_dig_ps)
+        p1_M1_prep0 = np.nanmean(M2_dig_ps)
+        #############
+        ## p for prep 1
+        #############
+        p0_init_prep1 = 1-np.nanmean(M4_dig_ps)
+        p1_init_prep1 = np.nanmean(M4_dig_ps)
+        p0_M1_prep1 = 1-np.nanmean(M5_dig_ps)
+        p1_M1_prep1 = np.nanmean(M5_dig_ps)
+        #############
+        ## pij calculation
+        #############
+        p00_prep0 = np.nanmean(1-np.logical_or(M2_dig_ps, M3_dig_ps))
+        p00_prep1 = np.nanmean(1-np.logical_or(M5_dig_ps, M6_dig_ps))
+        p01_prep0 = np.nanmean(1-np.logical_or(np.logical_not(M3_dig), M2_dig))
+        p01_prep1 = np.nanmean(1-np.logical_or(np.logical_not(M6_dig), M5_dig))
+        p10_prep0 = np.nanmean(1-np.logical_or(np.logical_not(M2_dig), M3_dig))
+        p10_prep1 = np.nanmean(1-np.logical_or(np.logical_not(M5_dig), M6_dig))
+        p11_prep0 = np.nanmean(np.logical_and(M2_dig, M3_dig))
+        p11_prep1 = np.nanmean(np.logical_and(M5_dig, M6_dig))
+
+        #############
+        ## eps calculations
+        #############
+        ## calculation e +1 when prep 0
+        t1 = ((p1_M1_prep1*p00_prep0)/(p0_M1_prep1))-p01_prep0
+        t2 = ((p0_M1_prep0*p1_M1_prep1)/(p0_M1_prep1)-p1_M1_prep0)
+        ep1_0_0 =  t1/t2
+        ep1_1_0 = p0_M1_prep0 - ep1_0_0
+        ## calculation e -1 when prep 0
+        t1 = ((p1_M1_prep1*p10_prep0)/(p0_M1_prep1))-p11_prep0
+        t2 = ((p0_M1_prep0*p1_M1_prep1)/(p0_M1_prep1)-p1_M1_prep0)
+        en1_0_0 =  t1/t2
+        en1_1_0 = p1_M1_prep0 - en1_0_0
+        ## calculation e +1 when prep 1
+        t1 = ((p1_M1_prep1*p00_prep1)/(p0_M1_prep1))-p01_prep1
+        t2 = ((p0_M1_prep0*p1_M1_prep1)/(p0_M1_prep1)-p1_M1_prep0)
+        ep1_0_1 =  t1/t2
+        ep1_1_1 = p0_M1_prep1 - ep1_0_1
+        ## calculation e -1 when prep 1
+        t1 = ((p1_M1_prep1*p10_prep1)/(p0_M1_prep1))-p11_prep1
+        t2 = ((p0_M1_prep0*p1_M1_prep1)/(p0_M1_prep1)-p1_M1_prep0)
+        en1_0_1 =  t1/t2
+        en1_1_1 = p1_M1_prep1 - en1_0_1
+        # save proc dict
+        # cal points
+        self.proc_data_dict["I0"], self.proc_data_dict["Q0"] = I0, Q0
+        self.proc_data_dict["I1"], self.proc_data_dict["Q1"] = I1, Q1
+        if self.f_state:
+            self.proc_data_dict["I2"], self.proc_data_dict["Q2"] = I2, Q2
+            self.proc_data_dict["center_2"] = center_2
+        # shots
+        self.proc_data_dict["IM1"], self.proc_data_dict["QM1"] = (IM1,QM1,)  # used for postselection for 0 state
+        self.proc_data_dict["IM2"], self.proc_data_dict["QM2"] = IM2, QM2
+        self.proc_data_dict["IM3"], self.proc_data_dict["QM3"] = IM3, QM3
+        self.proc_data_dict["IM4"], self.proc_data_dict["QM4"] = (IM4,QM4,)  # used for postselection for 1 state
+        self.proc_data_dict["IM5"], self.proc_data_dict["QM5"] = IM5, QM5
+        self.proc_data_dict["IM6"], self.proc_data_dict["QM6"] = IM6, QM6
+        if self.f_state:
+            self.proc_data_dict["IM7"], self.proc_data_dict["QM7"] = (IM7,QM7,)  # used for postselection for 2 state
+            self.proc_data_dict["IM8"], self.proc_data_dict["QM8"] = IM8, QM8
+            self.proc_data_dict["IM9"], self.proc_data_dict["QM9"] = IM9, QM9
+        # center of the prepared states
+        self.proc_data_dict["center_0"] = center_0
+        self.proc_data_dict["center_1"] = center_1
+        if self.f_state:
+            self.proc_data_dict["center_2"] = center_2
+        self.proc_data_dict['I0_proc'], self.proc_data_dict['Q0_proc'] = I0_proc, Q0_proc
+        self.proc_data_dict['I1_proc'], self.proc_data_dict['Q1_proc'] = I1_proc, Q1_proc
+        self.proc_data_dict['threshold'] = threshold
+        self.qoi = {}
+        self.qoi['p00_0'] = p00_prep0
+        self.qoi['p00_1'] = p00_prep1
+        self.qoi['p11_0'] = p11_prep0
+        self.qoi['p11_1'] = p11_prep1
+        self.qoi['p01_0'] = p01_prep0
+        self.qoi['p01_1'] = p01_prep1
+        self.qoi['p10_0'] = p10_prep0
+        self.qoi['p10_1'] = p10_prep1
+        self.qoi['Fidelity'] = Fidelity
+        self.qoi['ps_fraction_0'] = fraction_discarded_I
+        self.qoi['ps_fraction_1'] = fraction_discarded_I1
+        self.qoi['ep1_0_0'] = ep1_0_0
+        self.qoi['ep1_1_0'] = ep1_1_0
+        self.qoi['en1_0_0'] = en1_0_0
+        self.qoi['en1_1_0'] = en1_1_0
+        self.qoi['ep1_0_1'] = ep1_0_1
+        self.qoi['ep1_1_1'] = ep1_1_1
+        self.qoi['en1_0_1'] = en1_0_1
+        self.qoi['en1_1_1'] = en1_1_1
+        if self.f_state:
+            ## QND for qutrit RO
+            dataset = create_xr_data(self.proc_data_dict,self.qubit,self.timestamp)
+            NUM_STATES = NUM_OUTCOMES = 3
+            STATES = np.arange(NUM_STATES)
+            OUTCOMES = np.arange(NUM_OUTCOMES)
+            data_subset = dataset.sel(state=STATES)
+            char_data = data_subset.characterization.copy(deep=True)
+            cal_data = data_subset.calibration.copy(deep=True)
+            classifier = LinearDiscriminantAnalysis(
+                solver="svd",
+                shrinkage=None,
+                tol=1e-4)
+            train_data = cal_data.stack(stacked_dim = ("state", "shot"))
+            train_data = train_data.transpose("stacked_dim", "comp")
+            classifier.fit(train_data, train_data.state)
+            accuracy = classifier.score(train_data, train_data.state)
+            print(f"Total classifier accuracy on the calibration dataset: {accuracy*100:.3f} %")
+            fid = {}
+            for state in STATES:
+                data_subset = train_data.sel(state = state)
+                subset_labels = xr.full_like(data_subset.shot, state)
+                state_accuracy = classifier.score(data_subset, subset_labels)
+                fid[f'{state}'] = state_accuracy*100
+                print(f"State {state} accuracy on the calibration dataset: {state_accuracy*100:.3f} %")
+            fit_res = QND_qutrit_anaylsis(NUM_STATES,
+                                          NUM_OUTCOMES,
+                                          STATES,
+                                          OUTCOMES,
+                                          char_data,
+                                          cal_data,
+                                          fid,
+                                          accuracy,
+                                          self.timestamp,
+                                          classifier)
+            dec_bounds = _decision_boundary_points(classifier.coef_, classifier.intercept_)
+            self.proc_data_dict['classifier'] = classifier
+            self.proc_data_dict['dec_bounds'] = dec_bounds
+            self.qoi['fit_res'] = fit_res
+
+    def prepare_plots(self):
+
+        self.axs_dict = {}
+        fig, axs = plt.subplots(figsize=(4,2), dpi=200)
+        # fig.patch.set_alpha(0)
+        self.axs_dict['msmt_butterfly'] = axs
+        self.figs['msmt_butterfly'] = fig
+        self.plot_dicts['msmt_butterfly'] = {
+            'plotfn': plot_msmt_butterfly,
+            'ax_id': 'msmt_butterfly',
+            'I0_proc': self.proc_data_dict['I0_proc'],
+            'I1_proc': self.proc_data_dict['I1_proc'],
+            'threshold': self.proc_data_dict['threshold'],
+            'Fidelity': self.qoi['Fidelity'],
+            'qubit': self.qubit,
+            'qoi' : self.qoi,
+            'timestamp': self.timestamp
+        }
+        if self.f_state:
+            _shots_0 = np.hstack((np.array([self.proc_data_dict['I0']]).T,
+                                  np.array([self.proc_data_dict['Q0']]).T))
+            _shots_1 = np.hstack((np.array([self.proc_data_dict['I1']]).T,
+                                  np.array([self.proc_data_dict['Q1']]).T))
+            _shots_2 = np.hstack((np.array([self.proc_data_dict['I2']]).T,
+                                  np.array([self.proc_data_dict['Q2']]).T))
+            fig = plt.figure(figsize=(8,4), dpi=100)
+            axs = [fig.add_subplot(121)]
+            # fig.patch.set_alpha(0)
+            self.axs_dict[f'IQ_readout_histogram_{self.qubit}'] = axs[0]
+            self.figs[f'IQ_readout_histogram_{self.qubit}'] = fig
+            self.plot_dicts[f'IQ_readout_histogram_{self.qubit}'] = {
+                'plotfn': ssro_IQ_projection_plotfn2,
+                'ax_id': f'IQ_readout_histogram_{self.qubit}',
+                'shots_0': _shots_0,
+                'shots_1': _shots_1,
+                'shots_2': _shots_2,
+                'classifier': self.proc_data_dict['classifier'],
+                'dec_bounds': self.proc_data_dict['dec_bounds'],
+                'Fid_dict': self.qoi['fit_res']['fidelity'],
+                'qubit': self.qubit,
+                'timestamp': self.timestamp
+            }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+def plot_msmt_butterfly(I0_proc, I1_proc,
+                        threshold,Fidelity,
+                        timestamp,
+                        qubit,
+                        qoi,
+                        ax, **kw
+                        ):
+    # plot histogram of rotated shots
+    fig = ax.get_figure()
+    rang = np.max(list(np.abs(I0_proc))+list(np.abs(I1_proc)))
+    ax.hist(I0_proc, range=[-rang, rang], bins=100, color='C0', alpha=.75, label='ground')
+    ax.hist(I1_proc, range=[-rang, rang], bins=100, color='C3', alpha=.75, label='excited')
+    ax.axvline(threshold, ls='--', lw=.5, color='k', label='threshold')
+    ax.legend(loc='upper right', fontsize=3, frameon=False)
+    ax.set_yticks([])
+    ax.set_title('Rotated data', fontsize=9)
+    ax.set_xlabel('Integrated voltage (mV)', size=8)
+
+    if 0:
+        # Write results
+        text = '\n'.join(('Assignment Fid:',
+                          rf'$\mathrm{"{F_{g}}"}:\:\:\:\:\:\:{fit_res["fidelity"]["0"]:.2f}$%',
+                          rf'$\mathrm{"{F_{e}}"}:\:\:\:\:\:\:{fit_res["fidelity"]["1"]:.2f}$%',
+                          rf'$\mathrm{"{F_{f}}"}:\:\:\:\:\:\:{fit_res["fidelity"]["2"]:.2f}$%',
+                          rf'$\mathrm{"{F_{avg}}"}:\:\:\:{fit_res["qutrit_fidelity"]:.2f}$%',
+                          '',
+                          'QNDness:',
+                          rf'$\mathrm{"{QND_{g}}"}:\:\:\:\:\:\:{fit_res["state_qnd"]["0"]*100:.2f}$%',
+                          rf'$\mathrm{"{QND_{e}}"}:\:\:\:\:\:\:{fit_res["state_qnd"]["1"]*100:.2f}$%',
+                          rf'$\mathrm{"{QND_{f}}"}:\:\:\:\:\:\:{fit_res["state_qnd"]["2"]*100:.2f}$%',
+                          rf'$\mathrm{"{QND_{avg}}"}:\:\:\:{fit_res["mean_QND"]*100:.2f}$%',
+                          '',
+                          'L1 & seepage',
+                          rf'$\mathrm{"{L_{1}}"}:\:\:\:{fit_res["L1"]:.2f}$%',
+                          rf'$\mathrm{"{L_{2}}"}:\:\:\:{fit_res["seepage"]:.2f}$%',
+                          ))
+    else:
+        text = '\n'.join(('Assignment Fid:',
+                  rf'$\mathrm{"{F_{a}}"}:\:\:\:{qoi["Fidelity"]*100:.2f}$%',
+                  '',
+                  'QNDness:',
+                  rf'$\mathrm{"{QND_{g}}"}:\:\:\:\:\:\:{qoi["p00_0"]*100:.2f}$%',
+                  rf'$\mathrm{"{QND_{e}}"}:\:\:\:\:\:\:{qoi["p11_1"]*100:.2f}$%',
+                  rf'$\mathrm{"{QND_{avg}}"}:\:\:\:{(qoi["p00_0"] + qoi["p11_1"]) * 0.5 *100:.2f}$%',
+                  ))
+    props = dict(boxstyle='round', facecolor='gray', alpha=0.15)
+    ax.text(1.05, 0.99, text, transform=ax.transAxes, fontsize=6,
+            verticalalignment='top', bbox=props)
+    fig.suptitle(f'Qubit {qubit}\n{timestamp}', y=1.1, size=9)
+
+def ssro_IQ_projection_plotfn2(
+    shots_0, 
+    shots_1,
+    shots_2,
+    classifier,
+    dec_bounds,
+    Fid_dict,
+    timestamp,
+    qubit, 
+    ax, **kw):
+    fig = ax.get_figure()
+    axs = fig.get_axes()
+    # Fit 2D gaussians
+    from scipy.optimize import curve_fit
+    def twoD_Gaussian(data, amplitude, x0, y0, sigma_x, sigma_y, theta):
+        x, y = data
+        x0 = float(x0)
+        y0 = float(y0)    
+        a = (np.cos(theta)**2)/(2*sigma_x**2) + (np.sin(theta)**2)/(2*sigma_y**2)
+        b = -(np.sin(2*theta))/(4*sigma_x**2) + (np.sin(2*theta))/(4*sigma_y**2)
+        c = (np.sin(theta)**2)/(2*sigma_x**2) + (np.cos(theta)**2)/(2*sigma_y**2)
+        g = amplitude*np.exp( - (a*((x-x0)**2) + 2*b*(x-x0)*(y-y0) 
+                                + c*((y-y0)**2)))
+        return g.ravel()
+    def _fit_2D_gaussian(X, Y):
+        counts, _x, _y = np.histogram2d(X, Y, bins=[100, 100], density=True)
+        x = (_x[:-1] + _x[1:]) / 2
+        y = (_y[:-1] + _y[1:]) / 2
+        _x, _y = np.meshgrid(_x, _y)
+        x, y = np.meshgrid(x, y)
+        p0 = [counts.max(), np.mean(X), np.mean(Y), np.std(X), np.std(Y), 0]
+        popt, pcov = curve_fit(twoD_Gaussian, (x, y), counts.T.ravel(), p0=p0)
+        return popt
+    popt_0 = _fit_2D_gaussian(shots_0[:,0], shots_0[:,1])
+    popt_1 = _fit_2D_gaussian(shots_1[:,0], shots_1[:,1])
+    popt_2 = _fit_2D_gaussian(shots_2[:,0], shots_2[:,1])
+    # Plot stuff
+    axs[0].plot(shots_0[:10000,0], shots_0[:10000,1], '.', color='C0', alpha=0.025)
+    axs[0].plot(shots_1[:10000,0], shots_1[:10000,1], '.', color='C3', alpha=0.025)
+    axs[0].plot(shots_2[:10000,0], shots_2[:10000,1], '.', color='C2', alpha=0.025)
+    axs[0].plot([0, popt_0[1]], [0, popt_0[2]], '--', color='k', lw=.5)
+    axs[0].plot([0, popt_1[1]], [0, popt_1[2]], '--', color='k', lw=.5)
+    axs[0].plot([0, popt_2[1]], [0, popt_2[2]], '--', color='k', lw=.5)
+    axs[0].plot(popt_0[1], popt_0[2], '.', color='C0', label='ground')
+    axs[0].plot(popt_1[1], popt_1[2], '.', color='C3', label='excited')
+    axs[0].plot(popt_2[1], popt_2[2], '.', color='C2', label='$2^\mathrm{nd}$ excited')
+    axs[0].plot(popt_0[1], popt_0[2], 'x', color='white')
+    axs[0].plot(popt_1[1], popt_1[2], 'x', color='white')
+    axs[0].plot(popt_2[1], popt_2[2], 'x', color='white')
+    # Draw 4sigma ellipse around mean
+    from matplotlib.patches import Ellipse
+    circle_0 = Ellipse((popt_0[1], popt_0[2]),
+                      width=4*popt_0[3], height=4*popt_0[4],
+                      angle=-popt_0[5]*180/np.pi,
+                      ec='white', fc='none', ls='--', lw=1.25, zorder=10)
+    axs[0].add_patch(circle_0)
+    circle_1 = Ellipse((popt_1[1], popt_1[2]),
+                      width=4*popt_1[3], height=4*popt_1[4],
+                      angle=-popt_1[5]*180/np.pi,
+                      ec='white', fc='none', ls='--', lw=1.25, zorder=10)
+    axs[0].add_patch(circle_1)
+    circle_2 = Ellipse((popt_2[1], popt_2[2]),
+                      width=4*popt_2[3], height=4*popt_2[4],
+                      angle=-popt_2[5]*180/np.pi,
+                      ec='white', fc='none', ls='--', lw=1.25, zorder=10)
+    axs[0].add_patch(circle_2)
+    # Plot classifier zones
+    from matplotlib.patches import Polygon
+    _all_shots = np.concatenate((shots_0, shots_1))
+    _lim = np.max([ np.max(np.abs(_all_shots[:,0]))*1.1, np.max(np.abs(_all_shots[:,1]))*1.1 ])
+    Lim_points = {}
+    for bound in ['01', '12', '02']:
+        dec_bounds['mean']
+        _x0, _y0 = dec_bounds['mean']
+        _x1, _y1 = dec_bounds[bound]
+        a = (_y1-_y0)/(_x1-_x0)
+        b = _y0 - a*_x0
+        _xlim = 1e2*np.sign(_x1-_x0)
+        _ylim = a*_xlim + b
+        Lim_points[bound] = _xlim, _ylim
+    # Plot 0 area
+    _points = [dec_bounds['mean'], Lim_points['01'], Lim_points['02']]
+    _patch = Polygon(_points, color='C0', alpha=0.2, lw=0)
+    axs[0].add_patch(_patch)
+    # Plot 1 area
+    _points = [dec_bounds['mean'], Lim_points['01'], Lim_points['12']]
+    _patch = Polygon(_points, color='C3', alpha=0.2, lw=0)
+    axs[0].add_patch(_patch)
+    # Plot 2 area
+    _points = [dec_bounds['mean'], Lim_points['02'], Lim_points['12']]
+    _patch = Polygon(_points, color='C2', alpha=0.2, lw=0)
+    axs[0].add_patch(_patch)
+    # Plot decision boundary
+    for bound in ['01', '12', '02']:
+        _x0, _y0 = dec_bounds['mean']
+        _x1, _y1 = Lim_points[bound]
+        axs[0].plot([_x0, _x1], [_y0, _y1], 'k--', lw=1)
+    axs[0].set_xlim(-_lim, _lim)
+    axs[0].set_ylim(-_lim, _lim)
+    axs[0].legend(frameon=False, loc=1)
+    axs[0].set_xlabel('Integrated voltage I')
+    axs[0].set_ylabel('Integrated voltage Q')
+    axs[0].set_title(f'{timestamp}\nIQ plot qubit {qubit}')
+    # Write fidelity textbox
+    _f_avg = np.mean((Fid_dict["0"], Fid_dict["1"], Fid_dict["2"]))
+    text = '\n'.join(('Assignment fidelity:',
+                      f'$F_g$ : {Fid_dict["0"]:.1f}%',
+                      f'$F_e$ : {Fid_dict["1"]:.1f}%',
+                      f'$F_f$ : {Fid_dict["2"]:.1f}%',
+                      f'$F_\mathrm{"{avg}"}$ : {_f_avg:.1f}%'))
+    props = dict(boxstyle='round', facecolor='gray', alpha=.2)
+    axs[0].text(1.05, 1, text, transform=axs[0].transAxes,
+                verticalalignment='top', bbox=props)
+
+
+############# END #################################
 
 class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 

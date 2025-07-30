@@ -304,6 +304,20 @@ class CC(CCCore, Instrument, DIO.CalInterface):
                                  (3, list(staircase_sequence+ (staircase_sequence << 3)))]
             dio_mask = 0x8FFF8FFF
 
+        elif dio_mode == "hdawg":
+            cc_prog = inspect.cleandoc("""
+                        mainLoop:   seq_out         0xFFFF0000,1        
+                                    seq_out         0x00000000,1
+                                    jmp             @mainLoop
+                        """)
+
+            dio_mask = 0xbfff0000
+
+            expected_sequence = [(0, [1023]),
+                                 (1, [1023]),
+                                 (2, [1]),
+                                 (3, [1])]
+
 
         elif dio_mode == "uhfqa":  # FIXME: no official mode yet
             cc_prog = inspect.cleandoc("""

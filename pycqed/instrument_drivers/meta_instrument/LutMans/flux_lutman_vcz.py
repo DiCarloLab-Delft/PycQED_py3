@@ -170,7 +170,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         Generate CZ waveforms and populates self._wave_dict
         """
         self._wave_dict = {}
-
+        
         for _, waveform in self.LutMap().items():
             wave_name = waveform["name"]
             if waveform["type"] == "cz" or waveform["type"] == "idle_z":
@@ -256,6 +256,14 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 # initial value is chosen to not raise errors
                 initial_value=6e9,
                 unit="Hz",
+                parameter_class=ManualParameter,
+            )
+            self.add_parameter(
+                "q_amp_center_%s" % this_cz,
+                docstring="center amplitude for cz sweeps",
+                unit="a.u.",
+                vals=vals.Numbers(0, 1),
+                initial_value=0,
                 parameter_class=ManualParameter,
             )
             self.add_parameter(
@@ -1277,4 +1285,7 @@ class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
 
 
 def roundup1024(n):
-    return int(np.ceil(n / 96) * 96)  # FIXME: does not perform rounding implied by function name
+    #return int(np.ceil(n / 96) * 96)
+    #LDC changing this 2022/07:
+    #Enforcing an integer number of QuSurf heartbeats, rather than an even integer.
+    return int(np.ceil(n / 48) * 48)

@@ -1313,6 +1313,7 @@ CosModel.guess = Cos_guess
 CosModel2 = lmfit.Model(CosFunc2)
 ResonatorArch = lmfit.Model(resonator_flux)
 ExpDecayModel = lmfit.Model(ExpDecayFunc)
+DoubleExpDecayModel = lmfit.Model(DoubleExpDecayFunc)
 TripleExpDecayModel = lmfit.Model(TripleExpDecayFunc)
 ExpDecayModel.guess = exp_dec_guess  # todo: fix
 ExpDampOscModel = lmfit.Model(ExpDampOscFunc)

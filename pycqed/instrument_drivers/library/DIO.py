@@ -138,6 +138,13 @@ _control_modes = {
             [27, 26, 25]
         ],
         "trigger_bits": [31,15]
+    },
+    "calibration":{
+        "control_bits":[
+            [30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16],
+            [32]
+        ],
+        "trigger_bits": [16]
     }
 }
 

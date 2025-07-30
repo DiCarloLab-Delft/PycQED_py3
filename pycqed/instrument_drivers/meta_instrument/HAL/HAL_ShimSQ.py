@@ -634,8 +634,8 @@ class HAL_ShimSQ(Qubit):
 
         # added by RDC 16/09/2023, PPC
         self.add_parameter(
-            'cancellation_phase',
-            initial_value=180,
+            'pump_on',
+            initial_value=False,
             parameter_class=ManualParameter)
 
         self.add_parameter(
@@ -647,10 +647,20 @@ class HAL_ShimSQ(Qubit):
             'pump_power',
             initial_value=-20,
             parameter_class=ManualParameter)
+        
+        self.add_parameter(
+            'cancellation_on',
+            initial_value=False,
+            parameter_class=ManualParameter)
 
         self.add_parameter(
             'cancellation_attenuation',
             initial_value=0,
+            parameter_class=ManualParameter)
+        
+        self.add_parameter(
+            'cancellation_phase',
+            initial_value=180,
             parameter_class=ManualParameter)
 
         #############################
@@ -1145,10 +1155,10 @@ class HAL_ShimSQ(Qubit):
             ro_lm.set('M_down_phi1_R{}'.format(idx), self.ro_pulse_down_phi1())
             
             # # Added by RDC 16/06/2023, PPC
-            ro_lm.set('cancellation_phase{}'.format(idx), self.cancellation_phase())
-            ro_lm.set('cancellation_attenuation{}'.format(idx), self.cancellation_attenuation())
-            ro_lm.set('pump_freq{}'.format(idx), self.pump_freq())
-            ro_lm.set('pump_power{}'.format(idx), self.pump_power())
+            # ro_lm.set('cancellation_phase{}'.format(idx), self.cancellation_phase())
+            # ro_lm.set('cancellation_attenuation{}'.format(idx), self.cancellation_attenuation())
+            # ro_lm.set('pump_freq{}'.format(idx), self.pump_freq())
+            # ro_lm.set('pump_power{}'.format(idx), self.pump_power())
 
             # propagate acquisition delay (NB: affects all resonators)
             ro_lm.acquisition_delay(self.ro_acq_delay())  # FIXME: better located in _prep_ro_integration_weights?
@@ -1365,8 +1375,7 @@ class HAL_ShimSQ(Qubit):
 
     import sys, os, time
     import numpy as np
-    import zhinst.core as ziapi
-    from zhinst.toolkit import Session
+    import zhinst as ziapi
     from threading import Thread, Event
     import matplotlib.pyplot as plt
 
@@ -1386,7 +1395,10 @@ class HAL_ShimSQ(Qubit):
             SHFPPC channel; either communicates with Channel 1 (paramp_channel = 0) 
             or Channel 2 (paramp_channel = 1).
         """
+        device_SHFPPC.ppchannels[paramp_channel].synthesizer.pump.on(self.pump_on())
         device_SHFPPC.ppchannels[paramp_channel].synthesizer.pump.freq(self.pump_freq())
         device_SHFPPC.ppchannels[paramp_channel].synthesizer.pump.power(self.pump_power())
+
+        device_SHFPPC.ppchannels[paramp_channel].cancellation.on(self.cancellation_on())
         device_SHFPPC.ppchannels[paramp_channel].cancellation.phaseshift(self.cancellation_phase())
         device_SHFPPC.ppchannels[paramp_channel].cancellation.attenuation(self.cancellation_attenuation())

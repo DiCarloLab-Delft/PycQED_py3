@@ -4,6 +4,7 @@ Note:   a lot code was moved around within this file in December 2021. As a cons
         by 'git blame' makes little sense. See GIT tag 'release_v0.3' for the original file.
 """
 
+import os
 import time
 import logging
 import numpy as np
@@ -416,11 +417,23 @@ class HAL_Transmon(HAL_ShimSQ):
             label='RB single-qubit Clifford fidelity',
             vals=vals.Numbers(0, 1.0),
             parameter_class=ManualParameter)
+        # I believe these were first added by Miguel. 
+        # To my knowledge, only Quantum Inspire uses them.
+        # LDC, 2022/06/24
         for cardinal in ['NW','NE','SW','SE']:
             self.add_parameter(f'F_2QRB_{cardinal}',
                 initial_value=0,
                 label=f'RB two-qubit Clifford fidelity for edge {cardinal}',
                 vals=vals.Numbers(0, 1.0),
+                parameter_class=ManualParameter)
+        # LDC adding parameter to keep track of two-qubit phases. 
+        # These are used by Quantum Inspire. 
+        # 2022/06/24.
+        for cardinal in ['NW','NE','SW','SE']:
+            self.add_parameter(f'CZ_two_qubit_phase_{cardinal}',
+                initial_value=0,
+                label=f'Two-qubit phase for CZ on edge {cardinal}',
+                vals=vals.Numbers(0, 360),
                 parameter_class=ManualParameter)
 
     ##########################################################################
@@ -809,13 +822,25 @@ class HAL_Transmon(HAL_ShimSQ):
     # calibrate_ functions (HAL_Transmon specific)
     ##########################################################################
 
-    def calibrate_ro_pulse_amp_CW(self, freqs=None, powers=None, update=True):
+    def calibrate_ro_pulse_amp_CW(self,
+                                  freqs=None,
+                                  powers=None,
+                                  update=True,
+                                  LO_freq_mod = -100e6):
         # USED_BY: device_dependency_graphs.py
         """
         Does a resonator power scan and determines at which power the low power
         regime is exited. If update=True, will set the readout power to this
         power.
         """
+
+        print(f'Setting {self.instr_LutMan_RO()} to None value ...')
+        RO_lutman = self.find_instrument(self.instr_LutMan_RO())
+        old_LO_freq = RO_lutman.LO_freq()
+        RO_lutman.LO_freq(LO_freq_mod)
+
+        self.ro_freq_mod(-100e6)
+        self.prepare_readout()
 
         if freqs is None:
             freq_center = self.freq_res()
@@ -840,6 +865,10 @@ class HAL_Transmon(HAL_ShimSQ):
                 logging.info('No qubit frquency found. Updating with RWA to {}'
                              .format(f_qubit_estimate))
                 self.freq_qubit(f_qubit_estimate)
+
+        print(f'Setting {self.instr_LutMan_RO()} to its previous value ...')
+        RO_lutman.LO_freq(old_LO_freq)
+        self.prepare_readout()
 
         return True
 
@@ -868,6 +897,53 @@ class HAL_Transmon(HAL_ShimSQ):
                 amps = np.linspace(0, 1, 31)
 
         self.measure_rabi(amps=amps, MC=MC, analyze=False, all_modules=all_modules)
+
+        a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
+
+        # update QCDeS parameter
+        try:
+            # FIXME: move to HAL_ShimSQ
+            if self.cfg_with_vsm():
+                self.mw_vsm_G_amp(a.rabi_amplitudes['piPulse'])
+            else:
+                self.mw_channel_amp(a.rabi_amplitudes['piPulse'])
+        except(ValueError):
+            warnings.warn("Extracted piPulse amplitude out of parameter range. "
+                          "Keeping previous value.")
+        return True
+
+    def calibrate_mw_pulse_amplitude_coarse_ramzz(
+            self,
+            measurement_qubit,
+            ramzz_wait_time_ns,
+            amps=None,
+            close_fig=True,
+            verbose=False,
+            MC: Optional[MeasurementControl] = None,
+            update=True,
+            all_modules=False
+    ):
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs.py
+        """
+        Calibrates the pulse amplitude using a single rabi oscillation.
+        Depending on self.cfg_with_vsm uses VSM or AWG channel amplitude
+        to sweep the amplitude of the pi pulse
+
+        For details see self.measure_rabi
+        """
+        if amps is None:
+            if self.cfg_with_vsm():
+                amps = np.linspace(0.1, 1, 31)
+            else:
+                amps = np.linspace(0, 1, 31)
+
+        self.measure_rabi_ramzz(amps=amps,
+                                measurement_qubit = measurement_qubit,
+                                ramzz_wait_time_ns = ramzz_wait_time_ns,
+                                MC=MC,
+                                analyze=False,
+                                all_modules=all_modules)
 
         a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
 
@@ -1184,8 +1260,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         ad_func_pars = {'adaptive_function': nelder_mead,
                         'x0': [1.0, 0.0],
-                        'initial_step': [.15, 10],
-                        'no_improv_break': 15,
+                        'initial_step': [.15, 10], # 'no_improv_break': 15, used to be below
                         'minimize': True,
                         'maxiter': 500}
         MC.set_sweep_functions([S1, S2])
@@ -1300,7 +1375,8 @@ class HAL_Transmon(HAL_ShimSQ):
             freqs=None,
             amps=None,
             analyze: bool = True,
-            update: bool = True
+            update: bool = True,
+            disable_metadata = False
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs
@@ -1350,15 +1426,14 @@ class HAL_Transmon(HAL_ShimSQ):
         nested_MC.set_sweep_points(freqs)
         nested_MC.set_sweep_function_2D(self.ro_pulse_amp)
         nested_MC.set_sweep_points_2D(amps)
-
-        d = det.Function_Detector(self.measure_ssro,
+        d = det.Function_Detector(self.measure_ssro(),
                                   result_keys=['SNR', 'F_a', 'F_d'],
                                   value_names=['SNR', 'F_a', 'F_d'],
                                   value_units=['a.u.', 'a.u.', 'a.u.'],
                                   msmt_kw={'prepare': True}
                                   )
         nested_MC.set_detector_function(d)
-        nested_MC.run(name='RO_coarse_tuneup', mode='2D')
+        nested_MC.run(name='RO_coarse_tuneup', mode='2D', disable_snapshot_metadata = disable_metadata)
 
         if analyze is True:
             # Analysis
@@ -1489,6 +1564,7 @@ class HAL_Transmon(HAL_ShimSQ):
             self,
             MC: Optional[MeasurementControl] = None,
             nested_MC: Optional[MeasurementControl] = None,
+            nr_shots_per_case: int = 2 ** 13,  # 8192
             start_freq=None,
             start_amp=None,
             start_freq_step=None,
@@ -1496,7 +1572,8 @@ class HAL_Transmon(HAL_ShimSQ):
             optimize_threshold: float = .99,
             check_threshold: float = .90,
             analyze: bool = True,
-            update: bool = True
+            update: bool = True,
+            disable_metadata = False
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs
@@ -1524,7 +1601,7 @@ class HAL_Transmon(HAL_ShimSQ):
         '''
 
         ## check single-qubit ssro first, if assignment fidelity below 92.5%, run optimizer
-        self.measure_ssro(post_select=True)
+        self.measure_ssro(nr_shots_per_case=nr_shots_per_case, post_select=True)
         if self.F_ssro() > check_threshold:
             return True
 
@@ -1564,14 +1641,13 @@ class HAL_Transmon(HAL_ShimSQ):
         ad_func_pars = {'adaptive_function': nelder_mead,
                         'x0': [self.ro_freq(), self.ro_pulse_amp()],
                         'initial_step': [start_freq_step, start_amp_step],
-                        'no_improv_break': 10,
                         'minimize': False,
                         'maxiter': 20,
                         'f_termination': optimize_threshold}
         nested_MC.set_adaptive_function_parameters(ad_func_pars)
 
         nested_MC.set_optimization_method('nelder_mead')
-        nested_MC.run(name='RO_fine_tuneup', mode='adaptive')
+        nested_MC.run(name='RO_fine_tuneup', mode='adaptive', disable_snapshot_metadata = disable_metadata)
 
         if analyze is True:
             ma.OptimizationAnalysis(label='RO_fine_tuneup')
@@ -2219,7 +2295,12 @@ class HAL_Transmon(HAL_ShimSQ):
     # calibrate_ functions (overrides for class Qubit)
     ##########################################################################
 
-    def calibrate_motzoi(self, MC: Optional[MeasurementControl] = None, verbose=True, update=True, motzois=None):
+    def calibrate_motzoi(self,
+                         MC: Optional[MeasurementControl] = None,
+                         verbose=True,
+                         update=True,
+                         motzois=None,
+                         disable_metadata = False):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
         """
@@ -2235,7 +2316,7 @@ class HAL_Transmon(HAL_ShimSQ):
             motzois = gen_sweep_pts(center=0, span=.3, num=31)
 
         # large range
-        a = self.measure_motzoi(MC=MC, motzoi_amps=motzois, analyze=True)
+        a = self.measure_motzoi(MC=MC, motzoi_amps=motzois, analyze=True,  disable_metadata = disable_metadata)
         opt_motzoi = a.get_intersect()[0]
         if opt_motzoi > max(motzois) or opt_motzoi < min(motzois):
             if verbose:
@@ -2391,11 +2472,13 @@ class HAL_Transmon(HAL_ShimSQ):
             optimal_IQ: bool = False,
             measure_transients_CCL_switched: bool = False,
             prepare: bool = True,
-            disable_metadata: bool = False,
+            disable_metadata: bool = True,
             nr_shots_per_case: int = 2 ** 13,
             post_select: bool = False,
             averages: int = 2 ** 15,
             post_select_threshold: float = None,
+            depletion_analysis: bool = False,
+            depletion_optimization_window = None
     ) -> bool:
         """
         Measures readout transients for the qubit in ground and excited state to indicate
@@ -2431,10 +2514,18 @@ class HAL_Transmon(HAL_ShimSQ):
                                                               analyze=analyze,
                                                               depletion_analysis=False)
         else:
-            transients = self.measure_transients(MC=MC, analyze=analyze,
-                                                 depletion_analysis=False,
-                                                 disable_metadata=disable_metadata)
-        if analyze:
+            if depletion_analysis:
+                a, transients = self.measure_transients(MC=MC, analyze=analyze,
+                                                     depletion_analysis=depletion_analysis,
+                                                     disable_metadata=disable_metadata,
+                                                     depletion_optimization_window = depletion_optimization_window)
+            else:
+                transients = self.measure_transients(MC=MC, analyze=analyze,
+                                                     depletion_analysis=depletion_analysis,
+                                                     disable_metadata=disable_metadata)
+
+
+        if analyze and depletion_analysis == False:
             ma.Input_average_analysis(IF=self.ro_freq_mod())
 
         self.ro_acq_averages(old_avg)
@@ -2449,24 +2540,12 @@ class HAL_Transmon(HAL_ShimSQ):
         # fixme: deviding the weight functions by four to not have overflow in
         # thresholding of the UHFQC
         weight_scale_factor = 1. / (4 * np.max([maxI, maxQ]))
-        W_func_I = np.array(weight_scale_factor * optimized_weights_I)
-        W_func_Q = np.array(weight_scale_factor * optimized_weights_Q)
-
-        # Smooth optimal weight functions
-        T = np.arange(len(W_func_I))/1.8e9
-        W_demod_func_I = np.real( (W_func_I + 1j*W_func_Q)*np.exp(2j*np.pi * T * self.ro_freq_mod()) )
-        W_demod_func_Q = np.imag( (W_func_I + 1j*W_func_Q)*np.exp(2j*np.pi * T * self.ro_freq_mod()) )
-
-        from scipy.signal import medfilt
-        W_dsmooth_func_I = medfilt(W_demod_func_I, 101)
-        W_dsmooth_func_Q = medfilt(W_demod_func_Q, 101)
-
-        W_smooth_func_I = np.real( (W_dsmooth_func_I + 1j*W_dsmooth_func_Q)*np.exp(-2j*np.pi * T * self.ro_freq_mod()) )
-        W_smooth_func_Q = np.imag( (W_dsmooth_func_I + 1j*W_dsmooth_func_Q)*np.exp(-2j*np.pi * T * self.ro_freq_mod()) )
+        optimized_weights_I = np.array(weight_scale_factor * optimized_weights_I)
+        optimized_weights_Q = np.array(weight_scale_factor * optimized_weights_Q)
 
         if update:
-            self.ro_acq_weight_func_I(np.array(W_smooth_func_I))
-            self.ro_acq_weight_func_Q(np.array(W_smooth_func_Q))
+            self.ro_acq_weight_func_I(optimized_weights_I)
+            self.ro_acq_weight_func_Q(optimized_weights_Q)
             if optimal_IQ:
                 self.ro_acq_weight_type('optimal IQ')
             else:
@@ -2483,7 +2562,11 @@ class HAL_Transmon(HAL_ShimSQ):
                 return ssro_dict
         if verify:
             warnings.warn('Not verifying as settings were not updated.')
-        return True
+
+        if depletion_analysis:
+            return a
+        else:
+            return True
 
     ##########################################################################
     # measure_ functions (overrides for class Qubit)
@@ -2609,7 +2692,7 @@ class HAL_Transmon(HAL_ShimSQ):
             SNR_detector: bool = False,
             shots_per_meas: int = 2 ** 16,
             vary_residual_excitation: bool = True,
-            disable_metadata: bool = False,
+            disable_metadata: bool = True,
             label: str = ''
     ):
         # USED_BY: device_dependency_graphs_v2.py,
@@ -2665,8 +2748,6 @@ class HAL_Transmon(HAL_ShimSQ):
         # This snippet causes 0.08 s of overhead but is dangerous to bypass
         p = sqo.off_on(
             qubit_idx=self.cfg_qubit_nr(), pulse_comb='off_on',
-            nr_flux_dance=nr_flux_dance,
-            wait_time=wait_time,
             initialize=post_select,
             platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
@@ -2896,6 +2977,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
     def measure_spectroscopy(
             self,
+            cw_spec_power,
             freqs,
             mode='pulsed_marked',
             MC: Optional[MeasurementControl] = None,
@@ -2928,7 +3010,7 @@ class HAL_Transmon(HAL_ShimSQ):
         """
         if mode == 'CW':
             self._measure_spectroscopy_CW(
-                freqs=freqs, MC=MC,
+                cw_spec_power=cw_spec_power, freqs=freqs, MC=MC,
                 analyze=analyze, close_fig=close_fig,
                 label=label,
                 prepare_for_continuous_wave=prepare_for_continuous_wave
@@ -2950,6 +3032,229 @@ class HAL_Transmon(HAL_ShimSQ):
         else:
             logging.error(f'Mode {mode} not recognized. Available modes: "CW", "pulsed_marked", "pulsed_mixer"')
 
+    def measure_flux_frequency_timedomain(
+        self,
+        amplitude: float = None,
+        times: list = np.arange(20e-9, 40e-9, 1/2.4e9),
+        parked_qubits: list = None,
+        wait_time_flux: int = 0,
+        disable_metadata: bool = False,
+        analyze: bool = True,
+        prepare_for_timedomain: bool = True,
+        ):
+        """
+        Performs a cryoscope experiment to measure frequency
+        detuning for a given flux pulse amplitude.
+        Args:
+            Times: 
+                Flux pulse durations used for cryoscope trace.
+            Amplitudes: 
+                Amplitude of flux pulse used for cryoscope trace.
+        Note on analysis: The frequency is calculated based on 
+        a FFT of the cryoscope trace. This means the frequency
+        resolution of this measurement will be given by the duration
+        of the cryoscope trace. To minimize the duration of this 
+        measurement we obtain the center frequency of the FFT by
+        fitting it to a Lorentzian, which circumvents the frequency
+        sampling.
+        """
+        assert self.ro_acq_weight_type()=='optimal'
+        MC = self.instr_MC.get_instr()
+        nested_MC = self.instr_nested_MC.get_instr()
+        fl_lutman = self.instr_LutMan_Flux.get_instr()
+        if amplitude:
+            fl_lutman.sq_amp(amplitude)
+        out_voltage = fl_lutman.sq_amp()*\
+            fl_lutman.cfg_awg_channel_amplitude()*\
+            fl_lutman.cfg_awg_channel_range()/2 # +/- 2.5V, else, 5Vpp
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+            fl_lutman.load_waveforms_onto_AWG_lookuptable()
+        p = mqo.Cryoscope(
+            qubit_idxs=[self.cfg_qubit_nr()],
+            flux_cw="fl_cw_06",
+            wait_time_flux=wait_time_flux,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            cc=self.instr_CC.get_instr().name,
+            double_projections=False,
+        )
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+        self.instr_CC.get_instr().start()
+        sw_function = swf.FLsweep(fl_lutman, fl_lutman.sq_length,
+                                  waveform_name="square")
+        MC.set_sweep_function(sw_function)
+        MC.set_sweep_points(times)
+        values_per_point = 2
+        values_per_point_suffex = ["cos", "sin"]
+        d = self.get_int_avg_det(
+            values_per_point=values_per_point,
+            values_per_point_suffex=values_per_point_suffex,
+            single_int_avg=True,
+            always_prepare=False
+        )
+        MC.set_detector_function(d)
+        label = f'Voltage_to_frequency_{out_voltage:.2f}V_{self.name}'
+        MC.run(label,disable_snapshot_metadata=disable_metadata)
+        # Run analysis
+        if analyze:
+            a = ma2.cv2.Time_frequency_analysis(
+                label='Voltage_to_frequency')
+            return a
+    
+    def calibrate_flux_arc(
+        self,
+        Times: list = np.arange(20e-9, 40e-9, 1/2.4e9),
+        Amplitudes: list = [-0.4, -0.35, -0.3, 0.3, 0.35, 0.4],
+        parked_qubits: list = None,
+        update: bool = True,
+        disable_metadata: bool = False,
+        prepare_for_timedomain: bool = True):
+        """
+        Calibrates the polynomial coeficients for flux (voltage) 
+        to frequency conversion. Does so by measuring cryoscope traces
+        at different amplitudes.
+        Args:
+            Times: 
+                Flux pulse durations used to measure each
+                cryoscope trace.
+            Amplitudes: 
+                DAC amplitudes of flux pulse used for each
+                cryoscope trace.
+        """
+        assert self.ro_acq_weight_type()=='optimal'
+        nested_MC = self.instr_nested_MC.get_instr()
+        fl_lutman = self.instr_LutMan_Flux.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+            fl_lutman.load_waveforms_onto_AWG_lookuptable()
+        sw_function = swf.FLsweep(fl_lutman, fl_lutman.sq_amp,
+                          waveform_name="square")
+        nested_MC.set_sweep_function(sw_function)
+        nested_MC.set_sweep_points(Amplitudes)
+        def wrapper():
+            a = self.measure_flux_frequency_timedomain(
+                times = Times,
+                parked_qubits = parked_qubits,
+                disable_metadata=True,
+                prepare_for_timedomain=False)
+            return {'detuning':a.proc_data_dict['detuning']}
+        d = det.Function_Detector(
+            wrapper,
+            result_keys=['detuning'],
+            value_names=['detuning'],
+            value_units=['Hz'])
+        nested_MC.set_detector_function(d)
+        label = f'Voltage_frequency_arc_{self.name}'
+        nested_MC.run(label, disable_snapshot_metadata=disable_metadata)
+        a = ma2.cv2.Flux_arc_analysis(label='Voltage_frequency_arc',
+                    channel_amp=fl_lutman.cfg_awg_channel_amplitude(),
+                    channel_range=fl_lutman.cfg_awg_channel_range())
+        # Update detuning polynomial coeficients
+        if update:
+            p_coefs = a.qoi['P_coefs']
+            fl_lutman.q_polycoeffs_freq_01_det(p_coefs)
+        return a
+
+    def measurement_butterfly(
+            self,
+            prepare_for_timedomain: bool = True,
+            calibrate_optimal_weights: bool = False,
+            nr_max_acq: int = 2**17,
+            disable_metadata: bool = False,
+            f_state: bool = False,
+            no_figs: bool = False,
+            opt_for = None,
+            depletion_analysis: bool = False, 
+            depletion_optimization_window = None):
+        
+        init_ro_acq_weight_type = self.ro_acq_weight_type()
+        init_ro_acq_digitized = self.ro_acq_weight_type()
+        
+        # ensure readout settings are correct
+        print("Changing readout settings ...")
+        print("1. setting ro_acq_weight_type to 'optimal IQ' ")
+        print("2. setting ro_acq_weight_type to 'False' ")
+
+        self.ro_acq_weight_type('optimal IQ')
+        self.ro_acq_weight_type(False)
+
+        if calibrate_optimal_weights:
+            r = self.calibrate_optimal_weights(
+                prepare=prepare_for_timedomain,
+                verify=False, 
+                optimal_IQ=True,
+                disable_metadata=disable_metadata,
+                depletion_analysis = depletion_analysis,
+                depletion_optimization_window = depletion_optimization_window)
+
+        if prepare_for_timedomain and calibrate_optimal_weights == False:
+            self.prepare_for_timedomain()
+
+        d = self.int_log_det
+        # the msmt butterfly sequence has 3 measurements per state,
+        # therefore we need to make sure the number of shots is a multiple of that
+        uhfqc_max_avg = min(max(2**10, nr_max_acq), 2**20)
+
+        if f_state:
+            nr_measurements = 12
+        else:
+            nr_measurements = 8
+
+        nr_shots = int((uhfqc_max_avg//nr_measurements) * nr_measurements)
+        d.nr_shots = nr_shots
+        p = sqo.butterfly(
+            f_state = f_state,
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr()
+        )
+        MC = self.instr_MC.get_instr()
+        MC.soft_avg(1)
+        MC.live_plot_enabled(False)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        print(nr_shots)
+        MC.set_detector_function(d)
+        MC.run(
+            f"Measurement_butterfly_{self.name}_{f_state}",
+            disable_snapshot_metadata=disable_metadata
+        )
+        a = ma2.ra.measurement_butterfly_analysis(
+            qubit=self.name,
+            label='butterfly',
+            f_state=f_state,
+            extract_only=no_figs)
+        
+        print("Reverting readout settings to previous values ...")
+        self.ro_acq_weight_type(init_ro_acq_weight_type)
+        self.ro_acq_weight_type(init_ro_acq_digitized)
+        self.prepare_for_timedomain()
+
+        # calculate the cost function
+        c = {}
+        if opt_for == 'fidelity':
+            c['ro_cost'] = 0.1 * r['depletion_cost'] + (3 - (a.qoi['Fidelity'] + a.qoi['p00_0'] + a.qoi['p11_1']))
+        if opt_for == 'depletion':
+            c['ro_cost'] = 1 * r['depletion_cost'] + 0.1 * (3 - (a.qoi['Fidelity'] + a.qoi['p00_0'] + a.qoi['p11_1']))
+        if opt_for == 'total':
+            c['ro_cost'] = 10 * r['depletion_cost'] + 10 * (1 - a.qoi['Fidelity']) + 2 - (a.qoi['p00_0'] + a.qoi['p11_1'])
+
+        print('Important values:')
+        if opt_for != None:
+            print('- Depletion Cost: {}'.format(r['depletion_cost']))
+        print('- Assignment Fidelity: {}%'.format(np.round(a.qoi['Fidelity'] * 100, 2)))
+        print('- QND_g: {}%'.format(np.round(a.qoi['p00_0'] * 100, 2)))
+        print('- QND_e: {}%'.format(np.round(a.qoi['p11_1'] * 100, 2)))
+        if opt_for != None:
+            print('- Readout Pulse Cost: {}'.format(c['ro_cost']))
+
+        return c
+
+###################################
+
     def measure_transients(
             self,
             MC: Optional[MeasurementControl] = None,
@@ -2960,13 +3265,18 @@ class HAL_Transmon(HAL_ShimSQ):
             depletion_analysis_plot: bool = True,
             depletion_optimization_window=None,
             disable_metadata: bool = False,
-            plot_max_time=None
+            plot_max_time=None,
+            averages: int=2**15
     ):
         # docstring from parent class
         if MC is None:
             MC = self.instr_MC.get_instr()
         if plot_max_time is None:
-            plot_max_time = self.ro_acq_integration_length() + 250e-9
+            plot_max_time = self.ro_acq_integration_length() + 1000e-9
+
+        # store the original averaging settings so that we can restore them at the end.
+        old_avg = self.ro_acq_averages()
+        self.ro_acq_averages(averages)
 
         if prepare:
             self.prepare_for_timedomain()
@@ -3007,17 +3317,30 @@ class HAL_Transmon(HAL_ShimSQ):
             data = MC.run(
                 'Measure_transients{}_{}'.format(self.msmt_suffix, i),
                 disable_snapshot_metadata=disable_metadata)
+
             dset = data['dset']
             transients.append(dset.T[1:])
             if analyze:
                 ma.MeasurementAnalysis()
+        
+        # restore initial averaging settings.
+        self.ro_acq_averages(old_avg)
+        
         if depletion_analysis:
+            print('Sweeping parameters:')
+            print(r"- amp0 = {}".format(self.ro_pulse_up_amp_p0()))
+            print(r"- amp1 = {}".format(self.ro_pulse_up_amp_p1()))
+            print(r"- amp2 = {}".format(self.ro_pulse_down_amp0()))
+            print(r"- amp3 = {}".format(self.ro_pulse_down_amp1()))
+            print(r"- phi2 = {}".format(self.ro_pulse_down_phi0()))
+            print(r"- phi3 = {}".format(self.ro_pulse_down_phi1()))
+
             a = ma.Input_average_analysis(
                 IF=self.ro_freq_mod(),
                 optimization_window=depletion_optimization_window,
                 plot=depletion_analysis_plot,
                 plot_max_time=plot_max_time)
-            return a
+            return a, [np.array(t, dtype=np.float64) for t in transients] # before it was only a 
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
 
@@ -3062,6 +3385,59 @@ class HAL_Transmon(HAL_ShimSQ):
             )
         else:
             self.measure_rabi_channel_amp(
+                MC,
+                amps,
+                analyze,
+                close_fig,
+                real_imag,
+                prepare_for_timedomain,
+            )
+
+    def measure_rabi_ramzz(
+            self,
+            measurement_qubit,
+            ramzz_wait_time_ns,
+            MC: Optional[MeasurementControl] = None,
+            amps=np.linspace(0, 1, 31),
+            analyze=True,
+            close_fig=True,
+            real_imag=True,
+            prepare_for_timedomain=True,
+            all_modules=False
+    ):
+        """
+        Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
+        while the drive frequency and pulse duration is kept fixed
+
+        Args:
+            amps (array):
+                range of amplitudes to sweep. If cfg_with_vsm()==True pulse amplitude
+                is adjusted by sweeping the attenuation of the relevant gaussian VSM channel,
+                in max range (0.1 to 1.0).
+                If cfg_with_vsm()==False adjusts the channel amplitude of the AWG in range (0 to 1).
+
+        Relevant parameters:
+            mw_amp180 (float):
+                amplitude of the waveform corresponding to pi pulse (from 0 to 1)
+
+            mw_channel_amp (float):
+                AWG channel amplitude (digitally scaling the waveform; from 0 to 1)
+        """
+
+        if self.cfg_with_vsm():
+            self.measure_rabi_vsm(
+                MC,
+                amps,
+                analyze,
+                close_fig,
+                real_imag,
+                prepare_for_timedomain,
+                all_modules
+            )
+        else:
+            self.measure_rabi_channel_amp_ramzz(
+                measurement_qubit,
+                ramzz_wait_time_ns,
                 MC,
                 amps,
                 analyze,
@@ -3175,6 +3551,56 @@ class HAL_Transmon(HAL_ShimSQ):
 
         ma.Rabi_Analysis(label='rabi_')
         return True
+    
+    def measure_rabi_channel_amp_ramzz(
+            self,
+            measurement_qubit,
+            ramzz_wait_time_ns,
+            MC: Optional[MeasurementControl] = None,
+            amps=np.linspace(0, 1, 31),
+            analyze=True,
+            close_fig=True,
+            real_imag=True,
+            prepare_for_timedomain=True
+    ):
+        """
+        Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
+        while the drive frequency and pulse duration is kept fixed
+
+        Args:
+            amps (array):
+                range of amplitudes to sweep. Amplitude is adjusted via the channel
+                amplitude of the AWG, in max range (0 to 1).
+        """
+
+        MW_LutMan = self.instr_LutMan_MW.get_instr()
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+            measurement_qubit.prepare_for_timedomain()
+
+        p = sqo.off_on_ramzz(
+            qubit_idx=self.cfg_qubit_nr(),
+            measured_qubit_idx = measurement_qubit.cfg_qubit_nr(),
+            ramzz_wait_time_ns = ramzz_wait_time_ns,
+            pulse_comb='on',
+            initialize=False,
+            platf_cfg=self.cfg_openql_platform_fn())
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+
+        s = MW_LutMan.channel_amp
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(amps)
+        # real_imag is actually not polar and as such works for opt weights
+        measurement_qubit.int_avg_det_single._set_real_imag(real_imag)  # FIXME: changes state
+        MC.set_detector_function(measurement_qubit.int_avg_det_single)
+        MC.run(name='rabi_' + self.msmt_suffix)
+
+        ma.Rabi_Analysis(label='rabi_')
+        return True
 
     def measure_rabi_channel_amp_ramzz_measurement(self, meas_qubit,
                                                    ramzz_wait_time, MC=None,
@@ -3225,7 +3651,8 @@ class HAL_Transmon(HAL_ShimSQ):
     def measure_depletion_allxy(self, MC=None,
                                 analyze=True, close_fig=True,
                                 prepare_for_timedomain=True,
-                                label=''):
+                                label='',
+                                disable_metadata=False):
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
@@ -3236,9 +3663,10 @@ class HAL_Transmon(HAL_ShimSQ):
                              CCL=self.instr_CC.get_instr())
         d = self.int_avg_det
         MC.set_sweep_function(s)
-        MC.set_sweep_points(np.arange(21*2*3))
+        MC.set_sweep_points(np.arange(21*2*6))
         MC.set_detector_function(d)
-        MC.run('Depletion_AllXY'+self.msmt_suffix+label)
+        MC.run('Depletion_AllXY'+self.msmt_suffix+label,
+               disable_snapshot_metadata=disable_metadata)
         ma2.mra.Depletion_AllXY_analysis(self.name, label='Depletion')
 
     def measure_allxy(
@@ -3247,7 +3675,8 @@ class HAL_Transmon(HAL_ShimSQ):
             label: str = '',
             analyze=True,
             close_fig=True,
-            prepare_for_timedomain=True
+            prepare_for_timedomain=True,
+            disable_metadata = False
     ) -> float:
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -3262,7 +3691,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(np.arange(42))
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('AllXY' + label + self.msmt_suffix)
+        MC.run('AllXY' + label + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
@@ -3322,6 +3751,8 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             analyze=True,
             MC: Optional[MeasurementControl] = None,
+            disable_metadata: bool = False,
+            auto = True
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -3330,6 +3761,7 @@ class HAL_Transmon(HAL_ShimSQ):
         """
         N.B. this is a good example for a generic timedomain experiment using the HAL_Transmon.
         """
+
         if times is not None and nr_cz_instead_of_idle_time is not None:
             raise ValueError("Either idle time or CZ mode must be chosen!")
 
@@ -3386,57 +3818,73 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(times)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('T1' + self.msmt_suffix)
+        MC.run('T1' + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
-            a = ma.T1_Analysis(auto=True, close_fig=True)
+            a = ma.T1_Analysis(auto=auto, close_fig=True)
             if update:
                 self.T1(a.T1)
             return a.T1
 
-    def measure_T1_ramzz(self, meas_qubit, ramzz_wait_time,
-                         times=None, MC=None,
-                         analyze=True, close_fig=True, update=True,
-                         nr_flux_dance: float = None,
-                         prepare_for_timedomain=True):
-        # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using
-        # the CCL transmon.
+    def measure_T1_ramzz(
+            self,
+            measurement_qubit,
+            ramzz_wait_time_ns,
+            times=None,
+            update=True,
+            nr_flux_dance: float = None,
+            prepare_for_timedomain=True,
+            close_fig=True,
+            analyze=True,
+            MC: Optional[MeasurementControl] = None,
+    ):
+        # USED_BY: inspire_dependency_graph.py,
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs
+        # FIXME: split into basic T1 and T1 with flux dance
+        """
+        N.B. this is a good example for a generic timedomain experiment using the HAL_Transmon.
+        """
+
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        # default timing
         if times is None:
             times = np.linspace(0, self.T1() * 4, 31)
 
         # append the calibration points, times are for location in plot
         dt = times[1] - times[0]
-        times = np.concatenate([times,
-                                (times[-1] + 1 * dt,
-                                 times[-1] + 2 * dt,
-                                 times[-1] + 3 * dt,
-                                 times[-1] + 4 * dt)])
+
+        times = np.concatenate([times, (times[-1] + 1 * dt,
+                                        times[-1] + 2 * dt,
+                                        times[-1] + 3 * dt,
+                                        times[-1] + 4 * dt)])
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
-            meas_qubit.prepare_for_timedomain()
+            measurement_qubit.prepare_for_timedomain()
 
-        p = sqo.T1_ramzz(times=times[:-4],
-                         qubit_idx=self.cfg_qubit_nr(),
-                         meas_qubit_idx=meas_qubit.cfg_qubit_nr(),
-                         ramzz_wait_time_ns=ramzz_wait_time * 1e9,
-                         nr_flux_dance=nr_flux_dance,
-                         platf_cfg=self.cfg_openql_platform_fn())
+        p = sqo.T1_ramzz(
+            qubit_idx=self.cfg_qubit_nr(),
+            measured_qubit_idx = measurement_qubit.cfg_qubit_nr(),
+            ramzz_wait_time_ns = ramzz_wait_time_ns,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            times=times,
+            nr_flux_dance=nr_flux_dance,
+        )
 
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             parameter_name='Time',
-                             unit='s',
-                             CCL=self.instr_CC.get_instr())
-        d = self.int_avg_det
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            parameter_name='Time',
+            unit='s',
+            CCL=self.instr_CC.get_instr()
+        )
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
+        d = measurement_qubit.int_avg_det
         MC.set_detector_function(d)
-        MC.run('T1_' + self.name + '_ramzz_' + meas_qubit.name)
+        MC.run('T1' + self.msmt_suffix)
+
         if analyze:
             a = ma.T1_Analysis(auto=True, close_fig=True)
             if update:
@@ -3502,7 +3950,8 @@ class HAL_Transmon(HAL_ShimSQ):
             update=True,
             detector=False,
             double_fit=False,
-            test_beating=True
+            test_beating=True, 
+            disable_metadata = False
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -3561,7 +4010,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(times)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('Ramsey' + label + self.msmt_suffix)
+        MC.run('Ramsey' + label + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         # Restore old frequency value
         self.instr_LO_mw.get_instr().set('frequency', old_frequency)
@@ -3597,79 +4046,95 @@ class HAL_Transmon(HAL_ShimSQ):
                 }
                 return res
 
-    def measure_ramsey_ramzz(self, meas_qubit, ramzz_wait_time,
-                             times=None, MC=None,
-                             artificial_detuning: float = None,
-                             freq_qubit: float = None,
-                             label: str = '',
-                             prepare_for_timedomain=True,
-                             analyze=True, close_fig=True, update=True,
-                             detector=False,
-                             double_fit=False,
-                             test_beating=True):
-        # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using
-        # the CCL transmon.
+    def measure_ramsey_ramzz(
+            self,
+            measurement_qubit,
+            ramzz_wait_time_ns,
+            times=None,
+            MC: Optional[MeasurementControl] = None,
+            artificial_detuning: float = None,
+            freq_qubit: float = None,
+            label: str = '',
+            prepare_for_timedomain=True,
+            analyze=True,
+            close_fig=True,
+            update=True,
+            detector=False,
+            double_fit=False,
+            test_beating=True
+    ):
+        # USED_BY: inspire_dependency_graph.py,
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs
+
         if MC is None:
             MC = self.instr_MC.get_instr()
 
         # default timing
         if times is None:
             # funny default is because there is no real time sideband modulation
-            stepsize = max((self.T2_star()*4/61)//(abs(self.cfg_cycle_time()))
+            stepsize = max((self.T2_star() * 4 / 61) // (abs(self.cfg_cycle_time()))
                            * abs(self.cfg_cycle_time()), 40e-9)
-            times = np.arange(0, self.T2_star()*4, stepsize)
+            times = np.arange(0, self.T2_star() * 4, stepsize)
 
         if artificial_detuning is None:
-          # artificial_detuning = 0
+            # artificial_detuning = 0
             # raise ImplementationError("Artificial detuning does not work, currently uses real detuning")
             # artificial_detuning = 3/times[-1]
-            artificial_detuning = 5/times[-1]
+            artificial_detuning = 5 / times[-1]
 
         # append the calibration points, times are for location in plot
         dt = times[1] - times[0]
         times = np.concatenate([times,
-                                (times[-1]+1*dt,
-                                 times[-1]+2*dt,
-                                    times[-1]+3*dt,
-                                    times[-1]+4*dt)])
+                                (times[-1] + 1 * dt,
+                                 times[-1] + 2 * dt,
+                                 times[-1] + 3 * dt,
+                                 times[-1] + 4 * dt)])
+
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
-            meas_qubit.prepare_for_timedomain()
+            measurement_qubit.prepare_for_timedomain()
 
         # adding 'artificial' detuning by detuning the qubit LO
         if freq_qubit is None:
             freq_qubit = self.freq_qubit()
-        # this should have no effect if artificial detuning = 0. This is a bug,
+        # FIXME: this should have no effect if artificial detuning = 0. This is a bug,
         # this is real detuning, not artificial detuning
         old_frequency = self.instr_LO_mw.get_instr().get('frequency')
         self.instr_LO_mw.get_instr().set(
             'frequency', freq_qubit -
-            self.mw_freq_mod.get() + artificial_detuning)
+                         self.mw_freq_mod.get() + artificial_detuning)
 
-        p = sqo.Ramsey_ramzz(times,
-                             inv_qubit_idx=self.cfg_qubit_nr(),
-                             meas_qubit_idx=meas_qubit.cfg_qubit_nr(),
-                             ramzz_wait_time_ns=ramzz_wait_time*1e9,
-                             platf_cfg=self.cfg_openql_platform_fn())
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr(),
-                             parameter_name='Time', unit='s')
+        p = sqo.Ramsey_ramzz(
+            qubit_idx=self.cfg_qubit_nr(),
+            measured_qubit_idx = measurement_qubit.cfg_qubit_nr(),
+            ramzz_wait_time_ns = ramzz_wait_time_ns,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            times=times
+        )
 
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr(),
+            parameter_name='Time',
+            unit='s'
+        )
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
-
-        d = self.int_avg_det
+        d = measurement_qubit.int_avg_det
         MC.set_detector_function(d)
-        MC.run('Ramsey'+label+self.msmt_suffix)
+        MC.run('Ramsey' + label + self.msmt_suffix)
 
         # Restore old frequency value
         self.instr_LO_mw.get_instr().set('frequency', old_frequency)
 
         if analyze:
-            a = ma.Ramsey_Analysis(auto=True, close_fig=True,
-                                   freq_qubit=freq_qubit,
-                                   artificial_detuning=artificial_detuning)
+            a = ma.Ramsey_Analysis(
+                auto=True,
+                close_fig=True,
+                freq_qubit=freq_qubit,
+                artificial_detuning=artificial_detuning
+            )
             if test_beating and a.fit_res.chisqr > 0.4:
                 logging.warning('Found double frequency in Ramsey: large '
                                 'deviation found in single frequency fit.'
@@ -3791,7 +4256,8 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             update=True,
             label: str = '',
-            prepare_for_timedomain=True
+            prepare_for_timedomain=True, 
+            disable_metadata = False
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -3816,11 +4282,18 @@ class HAL_Transmon(HAL_ShimSQ):
 
         # default timing
         if times is None:
-            # funny default is because there is no real time sideband
-            # modulation
-            stepsize = max((self.T2_echo() * 2 / 61) // (abs(self.cfg_cycle_time()))
-                           * abs(self.cfg_cycle_time()), 20e-9)
-            times = np.arange(0, self.T2_echo() * 4, stepsize * 2)
+            # Old formulation of the time vector
+            ## funny default is because there is no real time sideband
+            ## modulation
+            #stepsize = max((self.T2_echo() * 2 / 61) // (abs(self.cfg_cycle_time()))
+            #               * abs(self.cfg_cycle_time()), 20e-9)
+            #times = np.arange(0, self.T2_echo() * 4, stepsize * 2)
+
+            # New version by LDC. 022/09/13
+            # I want all T2echo experiments to have the same number of time values.
+            numpts=51
+            stepsize = max((self.T2_echo() * 4 / (numpts-1)) // 40e-9, 1) * 40.0e-9
+            times = np.arange(0, numpts*stepsize, stepsize)
 
         # append the calibration points, times are for location in plot
         dt = times[1] - times[0]
@@ -3832,14 +4305,13 @@ class HAL_Transmon(HAL_ShimSQ):
 
         # Checking if pulses are on 20 ns grid
         if not all([np.round(t * 1e9) % (2 * self.cfg_cycle_time() * 1e9) == 0 for t in times]):
-            raise ValueError('timesteps must be multiples of 40e-9')
+            raise ValueError('timesteps must be multiples of 40 ns')
 
         # Checking if pulses are locked to the pulse modulation
         mw_lutman = self.instr_LutMan_MW.get_instr()
         if not all([np.round(t / 1 * 1e9) % (2 / self.mw_freq_mod.get() * 1e9) == 0 for t in times]) and \
                 mw_lutman.cfg_sideband_mode() != 'real-time':
-            raise ValueError(
-                'timesteps must be multiples of 2 modulation periods')
+            raise ValueError('timesteps must be multiples of 2 modulation periods')
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
@@ -3862,7 +4334,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(times)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('echo' + label + self.msmt_suffix)
+        MC.run('echo' + label + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             # N.B. v1.5 analysis
@@ -3871,8 +4343,9 @@ class HAL_Transmon(HAL_ShimSQ):
                 self.T2_echo(a.fit_res.params['tau'].value)
             return a
 
-    @deprecated(version='0.4', reason="broken")
-    def measure_echo_ramzz(self, measure_qubit, ramzz_wait_time,
+    def measure_echo_ramzz(self,
+                           measurement_qubit,
+                           ramzz_wait_time_ns,
                            times=None, MC=None,
                            analyze=True, close_fig=True, update=True,
                            label: str = '', prepare_for_timedomain=True):
@@ -3882,62 +4355,59 @@ class HAL_Transmon(HAL_ShimSQ):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        if 1:
-            raise NotImplementedError("FIXME: code is broken, parameter measure_qubit is accessed as meas_qubit: unresolved reference")
-        else:  # by disabling we no longer get errors from PyCharm
-            # default timing
-            if times is None:
-                # funny default is because there is no real time sideband
-                # modulation
-                stepsize = max((self.T2_echo()*2/61)//(abs(self.cfg_cycle_time()))
-                               * abs(self.cfg_cycle_time()), 20e-9)
-                times = np.arange(0, self.T2_echo()*4, stepsize*2)
+        # default timing
+        if times is None:
+            # funny default is because there is no real time sideband
+            # modulation
+            stepsize = max((self.T2_echo()*2/61)//(abs(self.cfg_cycle_time()))
+                            * abs(self.cfg_cycle_time()), 20e-9)
+            times = np.arange(0, self.T2_echo()*4, stepsize*2)
 
-            # append the calibration points, times are for location in plot
-            dt = times[1] - times[0]
-            times = np.concatenate([times,
-                                    (times[-1]+1*dt,
-                                     times[-1]+2*dt,
-                                        times[-1]+3*dt,
-                                        times[-1]+4*dt)])
+        # append the calibration points, times are for location in plot
+        dt = times[1] - times[0]
+        times = np.concatenate([times,
+                                (times[-1]+1*dt,
+                                    times[-1]+2*dt,
+                                    times[-1]+3*dt,
+                                    times[-1]+4*dt)])
 
-            mw_lutman = self.instr_LutMan_MW.get_instr()
-            # # Checking if pulses are on 20 ns grid
-            if not all([np.round(t*1e9) % (2*self.cfg_cycle_time()*1e9) == 0 for
-                        t in times]):
-                raise ValueError('timesteps must be multiples of 40e-9')
+        mw_lutman = self.instr_LutMan_MW.get_instr()
+        # # Checking if pulses are on 20 ns grid
+        if not all([np.round(t*1e9) % (2*self.cfg_cycle_time()*1e9) == 0 for
+                    t in times]):
+            raise ValueError('timesteps must be multiples of 40e-9')
 
-            # # Checking if pulses are locked to the pulse modulation
-            if not all([np.round(t/1*1e9) % (2/self.mw_freq_mod.get()*1e9) == 0 for t in times]) and\
-             mw_lutman.cfg_sideband_mode() != 'real-time':
-                raise ValueError(
-                    'timesteps must be multiples of 2 modulation periods')
+        # # Checking if pulses are locked to the pulse modulation
+        if not all([np.round(t/1*1e9) % (2/self.mw_freq_mod.get()*1e9) == 0 for t in times]) and\
+            mw_lutman.cfg_sideband_mode() != 'real-time':
+            raise ValueError(
+                'timesteps must be multiples of 2 modulation periods')
 
-            if prepare_for_timedomain:
-                self.prepare_for_timedomain()
-                meas_qubit.prepare_for_timedomain()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+            measurement_qubit.prepare_for_timedomain()
 
-            mw_lutman.load_phase_pulses_to_AWG_lookuptable()
-            p = sqo.echo_ramzz(times,
-                               inv_qubit_idx=self.cfg_qubit_nr(),
-                               meas_qubit_idx=meas_qubit.cfg_qubit_nr(),
-                               ramzz_wait_time_ns=ramzz_wait_time*1e9,
-                               platf_cfg=self.cfg_openql_platform_fn())
+        mw_lutman.load_phase_pulses_to_AWG_lookuptable()
+        p = sqo.echo_ramzz(times,
+                            qubit_idx=self.cfg_qubit_nr(),
+                            measurement_qubit_idx=measurement_qubit.cfg_qubit_nr(),
+                            ramzz_wait_time_ns=ramzz_wait_time_ns,
+                            platf_cfg=self.cfg_openql_platform_fn())
 
-            s = swf.OpenQL_Sweep(openql_program=p,
-                                 CCL=self.instr_CC.get_instr(),
-                                 parameter_name="Time", unit="s")
-            d = measure_qubit.int_avg_det
-            MC.set_sweep_function(s)
-            MC.set_sweep_points(times)
-            MC.set_detector_function(d)
-            MC.run('echo_'+label+self.name+'_ramzz_'+meas_qubit.name)
-            if analyze:
-                # N.B. v1.5 analysis
-                a = ma.Echo_analysis_V15(label='echo', auto=True, close_fig=True)
-                if update:
-                    self.T2_echo(a.fit_res.params['tau'].value)
-                return a
+        s = swf.OpenQL_Sweep(openql_program=p,
+                                CCL=self.instr_CC.get_instr(),
+                                parameter_name="Time", unit="s")
+        d = measurement_qubit.int_avg_det
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(times)
+        MC.set_detector_function(d)
+        MC.run('echo_'+label+self.name+'_ramzz_'+measurement_qubit.name)
+        if analyze:
+            # N.B. v1.5 analysis
+            a = ma.Echo_analysis_V15(label='echo', auto=True, close_fig=True)
+            if update:
+                self.T2_echo(a.fit_res.params['tau'].value)
+            return a
 
 
     def measure_restless_ramsey(
@@ -3988,10 +4458,9 @@ class HAL_Transmon(HAL_ShimSQ):
             analyze=True,
             close_fig=True,
             update=False,
-            flip_ef=False,
             ax='x',
             angle='180',
-            label=''):
+            disable_metadata = False):
         """
         Measurement for fine-tuning of the pi and pi/2 pulse amplitudes. Executes sequence
         pi (repeated N-times) - pi/2 - measure
@@ -4012,7 +4481,7 @@ class HAL_Transmon(HAL_ShimSQ):
             ax (str {'x', 'y'}):
                 axis arour which the pi pulses are to be performed. Possible values 'x' or 'y'
 
-            angle (str {'90', '180'}):r
+            angle (str {'90', '180'}):
                 specifies whether to apply pi or pi/2 pulses. Possible values: '180' or '90'
 
             update (bool):
@@ -4025,69 +4494,80 @@ class HAL_Transmon(HAL_ShimSQ):
             MC = self.instr_MC.get_instr()
 
         # allow flipping only with pi/2 or pi, and x or y pulses
-        assert angle in ['90','180']
+        assert angle in ['90', '180']
         assert ax.lower() in ['x', 'y']
 
         # append the calibration points, times are for location in plot
         nf = np.array(number_of_flips)
         dn = nf[1] - nf[0]
         nf = np.concatenate([nf,
-                                (nf[-1]+1*dn,
-                                nf[-1]+2*dn,
-                                nf[-1]+3*dn,
-                                nf[-1]+4*dn) ])
+                             (nf[-1] + 1 * dn,
+                              nf[-1] + 2 * dn,
+                              nf[-1] + 3 * dn,
+                              nf[-1] + 4 * dn)])
 
         self.prepare_for_timedomain()
-        p = sqo.flipping(number_of_flips=nf, equator=equator,flip_ef=flip_ef,
-                         qubit_idx=self.cfg_qubit_nr(),
-                         platf_cfg=self.cfg_openql_platform_fn(),
-                         ax=ax.lower(), angle=angle)
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             unit='#',
-                             CCL=self.instr_CC.get_instr())
-        d = self.int_avg_det
+
+        p = sqo.flipping(
+            number_of_flips=nf,
+            equator=equator,
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn(),
+            ax=ax.lower(),
+            angle=angle
+        )
+
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            unit='#',
+            CCL=self.instr_CC.get_instr()
+        )
         MC.set_sweep_function(s)
         MC.set_sweep_points(nf)
+        d = self.int_avg_det
         MC.set_detector_function(d)
-        if flip_ef:
-            label = 'ef_rx12'
-        MC.run('flipping_'+ax+angle+label+self.msmt_suffix)
+        MC.run('flipping_' + ax + angle + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
+
         if analyze:
-            a = ma2.FlippingAnalysis(
-                options_dict={'scan_label': 'flipping'})
+            a = ma2.FlippingAnalysis(options_dict={'scan_label': 'flipping'})
 
-        if update:
-            # choose scale factor based on simple goodness-of-fit comparison
-            # This method gives priority to the line fit: 
-            # the cos fit will only be chosen if its chi^2 relative to the 
-            # chi^2 of the line fit is at least 10% smaller 
-            if (a.fit_res['line_fit'].chisqr - a.fit_res['cos_fit'].chisqr)/a.fit_res['line_fit'].chisqr \
-                    > 0.1:
-                scale_factor = a._get_scale_factor_cos()
-            else:
-                scale_factor = a._get_scale_factor_line()
+            if update:
+                # choose scale factor based on simple goodness-of-fit comparison
+                # This method gives priority to the line fit:
+                # the cos fit will only be chosen if its chi^2 relative to the
+                # chi^2 of the line fit is at least 10% smaller
+                scale_factor = a.get_scale_factor()
 
-            if abs(scale_factor-1) < 1e-3:
-                print('Pulse amplitude accurate within 0.1%. Amplitude not updated.')
-                return a
+                # for debugging purposes
+                print(scale_factor)
 
-            if angle == '180':
-                if self.cfg_with_vsm():
-                    amp_old = self.mw_vsm_G_amp()
-                    self.mw_vsm_G_amp(scale_factor*amp_old)
-                else:
-                    amp_old = self.mw_channel_amp()
-                    self.mw_channel_amp(scale_factor*amp_old)
-            elif angle == '90':
-                amp_old = self.mw_amp90_scale()
-                self.mw_amp90_scale(scale_factor*amp_old)
+                if abs(scale_factor - 1) < 0.2e-3:
+                    print('Pulse amplitude accurate within 0.02%. Amplitude not updated.')
+                    return a
 
-            print('Pulse amplitude for {}-{} pulse changed from {:.3f} to {:.3f}'.format(
-                ax, angle, amp_old, scale_factor*amp_old))
+                if angle == '180':
+                    if self.cfg_with_vsm():
+                        amp_old = self.mw_vsm_G_amp()
+                        self.mw_vsm_G_amp(scale_factor * amp_old)
+                    else:
+                        amp_old = self.mw_channel_amp()
+                        self.mw_channel_amp(scale_factor * amp_old)
+                elif angle == '90':
+                    amp_old = self.mw_amp90_scale()
+                    self.mw_amp90_scale(scale_factor * amp_old)
+
+                print('Pulse amplitude for {}-{} pulse changed from {:.3f} to {:.3f}'.format(
+                    ax, angle, amp_old, scale_factor * amp_old))
 
         return a
 
-    def flipping_GBT(self, nr_sequence: int = 7):  # FIXME: prefix with "measure_"
+    def flipping_GBT(
+            self, 
+            nr_sequence: int = 7,                # max number of flipping iterations
+            number_of_flips=np.arange(0, 31, 2), # specifies the number of pi pulses at each step
+            eps=0.0005,
+            disable_metadata = False):                           # specifies the GBT threshold
+        # FIXME: prefix with "measure_"
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs.py
@@ -4097,10 +4577,32 @@ class HAL_Transmon(HAL_ShimSQ):
         Right now this method will always return true no matter what
         Later we can add a condition as a check.
         '''
+
+        ###############################################
+        ###############################################
+        # Monitor key temperatures of interest
+        # ADDED BY LDC.  THIS IS A KLUGE!
+        # CAREFUL, thsi is Quantum-Inspire specific!!!
+        # thisTWPA1=self.find_instrument('TWPA_pump_1')
+        # thisTWPA2=self.find_instrument('TWPA_pump_2')
+        # #thisVSM=self.find_instrument('VSM')
+        # TempTWPA1=thisTWPA1.temperature()
+        # TempTWPA2=thisTWPA2.temperature()
+        #TempVSM=thisVSM.temperature_avg()
+        # for diagnostics only
+        # print('Key temperatures (degC):')
+        # print('='*35)
+        # print(f'TWPA_Pump_1:\t{float(TempTWPA1):0.2f}')
+        # print(f'TWPA_Pump_2:\t{float(TempTWPA2):0.2f}')
+        # #print(f'VSM:\t\t{float(TempVSM):0.2f}')
+        # print('='*35)
+        ###############################################
+        ###############################################
+
         for i in range(nr_sequence):
-            a = self.measure_flipping(update=True)
-            scale_factor = a._get_scale_factor_line()
-            if abs(1 - scale_factor) <= 0.0005:
+            a = self.measure_flipping(update=True, number_of_flips=number_of_flips, disable_metadata = disable_metadata)
+            scale_factor = a.get_scale_factor()
+            if abs(1 - scale_factor) <= eps:
                 return True
         else:
             return False
@@ -4111,7 +4613,8 @@ class HAL_Transmon(HAL_ShimSQ):
             prepare_for_timedomain: bool = True,
             MC: Optional[MeasurementControl] = None,
             analyze=True,
-            close_fig=True
+            close_fig=True,
+            disable_metadata = False
     ):
         # USED_BY: device_dependency_graphs.py (via calibrate_motzoi)
         """
@@ -4186,7 +4689,7 @@ class HAL_Transmon(HAL_ShimSQ):
             always_prepare=True
         )
         MC.set_detector_function(d)
-        MC.run('Motzoi_XY' + self.msmt_suffix)
+        MC.run('Motzoi_XY' + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             if self.ro_acq_weight_type() == 'optimal':
@@ -4203,6 +4706,120 @@ class HAL_Transmon(HAL_ShimSQ):
                                   'ch_idx_B': 1},
                     normalized_probability=False)
             return a
+
+    def measure_rabi_mw_crosstalk(self, MC=None, amps=np.linspace(0, 1, 31),
+                             cross_driving_qubit=None,
+                             analyze=True, close_fig=True, real_imag=True,
+                             disable_metadata = False, 
+                             prepare_for_timedomain=True):
+        """
+        Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
+        while the drive frequency and pulse duration is kept fixed
+
+        Args:
+            amps (array):
+                range of amplitudes to sweep. Amplitude is adjusted via the channel
+                amplitude of the AWG, in max range (0 to 1).
+        """
+
+        if cross_driving_qubit is not None:
+            MW_LutMan = self.find_instrument(cross_driving_qubit).instr_LutMan_MW.get_instr()
+            qubi_cd_idx = self.find_instrument(cross_driving_qubit).cfg_qubit_nr()
+            self.find_instrument(cross_driving_qubit)._prep_td_sources()
+            self.find_instrument(cross_driving_qubit)._prep_mw_pulses()
+
+        else:
+            MW_LutMan = self.instr_LutMan_MW.get_instr()
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        
+        p = sqo.off_on_mw_crosstalk(
+            qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
+            initialize=False,
+            cross_driving_qubit=qubi_cd_idx if cross_driving_qubit else None,
+            platf_cfg=self.cfg_openql_platform_fn())
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+
+        s = MW_LutMan.channel_amp
+        print(s)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(amps)
+        # real_imag is acutally not polar and as such works for opt weights
+        self.int_avg_det_single._set_real_imag(real_imag)
+        MC.set_detector_function(self.int_avg_det_single)
+
+        label = f'_drive_{cross_driving_qubit}' if cross_driving_qubit else '' 
+        MC.run(name=f'rabi'+self.msmt_suffix+label,
+               disable_snapshot_metadata=disable_metadata)
+        a = None
+        try:
+            a = ma.Rabi_Analysis(label='rabi_')
+        except Exception as e:
+            warnings.warn("Failed to fit Rabi for the cross-driving case.")
+
+        if a:
+            return a
+
+    def measure_mw_crosstalk(self, MC=None, amps=np.linspace(0, 1, 121),
+                 cross_driving_qb=None,disable_metadata = False,
+                 analyze=True, close_fig=True, real_imag=True,
+                 prepare_for_timedomain=True):
+        """
+        Measure MW crosstalk matrix by measuring two Rabi experiments: 
+        1. a0 : standand rabi (drive the qubit qj through its dedicated drive line Dj) 
+        2. a1 : cross-drive rabi (drive the qubit qj through another drive line (Di)
+         at the freq of the qj) 
+        Args:
+            amps (array):
+                range of amplitudes to sweep. If cfg_with_vsm()==True pulse amplitude
+                is adjusted by sweeping the attenuation of the relevant gaussian VSM channel,
+                in max range (0.1 to 1.0).
+                If cfg_with_vsm()==False adjusts the channel amplitude of the AWG in range (0 to 1).
+
+            cross_driving_qubit is qubit qi with its drive line Di.
+        Relevant parameters:
+            mw_amp180 (float):
+                amplitude of the waveform corresponding to pi pulse (from 0 to 1)
+
+            mw_channel_amp (float):
+                AWG channel amplitude (digitally scaling the waveform; form 0 to 1)
+        """
+
+        try:    
+            freq_qj = self.freq_qubit() # set qi to this qubit freq of qubit j
+            cross_driving_qubit = None
+            amps=np.linspace(0, 0.1, 51)
+            a0 = self.measure_rabi_mw_crosstalk(MC, amps,cross_driving_qubit,
+                                          analyze, close_fig, real_imag,disable_metadata,
+                                          prepare_for_timedomain)
+
+            cross_driving_qubit = cross_driving_qb
+            qi = self.find_instrument(cross_driving_qubit)
+            freq_qi = qi.freq_qubit()
+            qi.freq_qubit(freq_qj)
+            amps=np.linspace(0, 1, 121)
+            prepare_for_timedomain = False
+            a1 = self.measure_rabi_mw_crosstalk(MC, amps,cross_driving_qubit,
+                                          analyze, close_fig, real_imag,disable_metadata,
+                                          prepare_for_timedomain)
+            ## set back the right parameters. 
+            qi.freq_qubit(freq_qi)
+        except:
+            qi.freq_qubit(freq_qi)
+            raise Exception('Experiment failed')
+
+        try:
+            pi_ajj = abs(a0.fit_result.params['period'].value) / 2
+            pi_aji = abs(a1.fit_result.params['period'].value) / 2
+
+            mw_isolation = 20*np.log10(pi_aji/pi_ajj)
+
+            return mw_isolation
+        except:
+            mw_isolation = 80
 
     ##########################################################################
     # measure_ functions (HAL_Transmon specific, not present in parent class Qubit)
@@ -4276,6 +4893,7 @@ class HAL_Transmon(HAL_ShimSQ):
             analyze: bool = True,
             close_fig: bool = True,
             fluxChan=None,
+            LO_freq_mod = -100e6,
             label=''
     ):
         """
@@ -4306,6 +4924,15 @@ class HAL_Transmon(HAL_ShimSQ):
             fluxChan (str):
                 channel of the flux control instrument corresponding to the qubit
         """
+
+        print(f'Setting {self.instr_LutMan_RO()} to None value ...')
+        RO_lutman = self.find_instrument(self.instr_LutMan_RO())
+        old_LO_freq = RO_lutman.LO_freq()
+        RO_lutman.LO_freq(None)
+
+        self.ro_freq_mod(LO_freq_mod)
+        self.prepare_readout()
+
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -4343,6 +4970,10 @@ class HAL_Transmon(HAL_ShimSQ):
 
         if analyze:
             ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig)
+
+        print(f'Setting {self.instr_LutMan_RO()} to its previous value ...')
+        RO_lutman.LO_freq(old_LO_freq)
+        self.prepare_readout()
 
     def measure_qubit_frequency_dac_scan(
             self, freqs,
@@ -4406,6 +5037,14 @@ class HAL_Transmon(HAL_ShimSQ):
             self.prepare_for_timedomain()
             self.mw_channel_amp(old_channel_amp)
         elif mode == 'CW' or mode == 'pulsed_marked':
+            init_mw_mixer_offs_GI = self.mw_mixer_offs_GI()
+            init_mw_mixer_offs_GQ = self.mw_mixer_offs_GQ()
+
+            print(f"Setting qubit {self.name} MW mixer offsets to zero ...")
+            self.mw_mixer_offs_GI(0.0)
+            self.mw_mixer_offs_GQ(0.0)
+            self.prepare_for_timedomain()
+            
             self.prepare_for_continuous_wave()
         else:
             logging.error('Mode {} not recognized'.format(mode))
@@ -4464,6 +5103,143 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Qubit_dac_scan' + self.msmt_suffix, mode='2D')
 
+        if mode == 'CW' or mode == 'pulsed_marked':
+            print(f"Setting qubit {self.name} MW mixer offsets back to ther initial value ...")
+            self.mw_mixer_offs_GI(init_mw_mixer_offs_GI)
+            self.mw_mixer_offs_GQ(init_mw_mixer_offs_GQ)
+            self.prepare_for_timedomain()
+
+        if analyze:
+            return ma.TwoD_Analysis(
+                label='Qubit_dac_scan',
+                close_fig=close_fig
+            )
+
+    def measure_qubit_frequency_dac_scan_ramzz(
+            self, freqs,
+            dac_values,
+            measurement_qubit,
+            ramzz_wait_time_ns,
+            mode='pulsed_marked',
+            MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            fluxChan=None,
+            close_fig=True,
+            nested_resonator_calibration=False,
+            nested_resonator_calibration_use_min=False,
+            resonator_freqs=None,
+            trigger_idx=None
+    ):
+        """
+        Performs the qubit spectroscopy while changing the current applied
+        to the flux bias line.
+
+        Args:
+            freqs (array):
+                MW drive frequencies to sweep over
+
+            dac_values (array):
+                values of the current to sweep over
+
+            mode (str {'pulsed_mixer', 'CW', 'pulsed_marked'}):
+                specifies the spectroscopy mode (cf. measure_spectroscopy method)
+
+            fluxChan (str):
+                Fluxchannel that is varied. Defaults to self.fl_dc_ch
+
+            nested_resonator_calibration (bool):
+                specifies whether to track the RO resonator
+                frequency (which itself is flux-dependent)
+
+            nested_resonator_calibration_use_min (bool):
+                specifies whether to use the resonance
+                minimum in the nested routine
+
+            resonator_freqs (array):
+                manual specifications of the frequencies over in which to
+                search for RO resonator in the nested routine
+
+            analyze (bool):
+                indicates whether to generate colormaps of the measured data
+
+            label (str):
+                suffix to append to the measurement label
+
+        Relevant qubit parameters:
+            instr_FluxCtrl (str):
+                instrument controlling the current bias
+
+            fluxChan (str):
+                channel of the flux control instrument corresponding to the qubit
+        """
+
+        if mode == 'pulsed_mixer':
+            old_channel_amp = self.mw_channel_amp()
+            self.mw_channel_amp(1)
+            self.prepare_for_timedomain()
+            self.mw_channel_amp(old_channel_amp)
+        elif mode == 'CW' or mode == 'pulsed_marked':
+            self.prepare_for_continuous_wave()
+            measurement_qubit.prepare_for_timedomain()
+        else:
+            logging.error('Mode {} not recognized'.format(mode))
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if trigger_idx is None:
+            trigger_idx = self.cfg_qubit_nr()
+
+        CC = self.instr_CC.get_instr()
+        if mode == 'pulsed_marked':
+            p = sqo.pulsed_spec_seq_marked(
+                qubit_idx=self.cfg_qubit_nr(),
+                spec_pulse_length=self.spec_pulse_length(),
+                platf_cfg=self.cfg_openql_platform_fn(),
+                trigger_idx=trigger_idx
+            )
+        else:
+            p = sqo.pulsed_spec_seq_ramzz(
+                qubit_idx=self.cfg_qubit_nr(),
+                measured_qubit_idx = measurement_qubit.cfg_qubit_nr(),
+                ramzz_wait_time_ns = ramzz_wait_time_ns,
+                spec_pulse_length=self.spec_pulse_length(),
+                platf_cfg=self.cfg_openql_platform_fn()
+            )
+        CC.eqasm_program(p.filename)
+        # CC gets started in the int_avg detector
+
+        dac_par = self.hal_flux_get_parameters(fluxChan)
+
+        if mode == 'pulsed_mixer':
+            spec_source = self.instr_spec_source_2.get_instr()
+            spec_source.on()
+        else:
+            spec_source = self.instr_spec_source.get_instr()
+            spec_source.on()
+            # if mode == 'pulsed_marked':
+            #     spec_source.pulsemod_state('On')
+
+        MC.set_sweep_function(spec_source.frequency)
+        MC.set_sweep_points(freqs)
+        if nested_resonator_calibration:
+            res_updating_dac_par = swf.Nested_resonator_tracker(
+                qubit=self,
+                nested_MC=self.instr_nested_MC.get_instr(),
+                freqs=resonator_freqs,
+                par=dac_par,
+                use_min=nested_resonator_calibration_use_min,
+                reload_sequence=True,
+                sequence_file=p,
+                cc=CC
+            )
+            MC.set_sweep_function_2D(res_updating_dac_par)
+        else:
+            MC.set_sweep_function_2D(dac_par)
+        MC.set_sweep_points_2D(dac_values)
+        measurement_qubit.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+        measurement_qubit.int_avg_det_single.always_prepare = True
+        MC.set_detector_function(measurement_qubit.int_avg_det_single)
+        MC.run(name='Qubit_dac_scan' + self.msmt_suffix, mode='2D')
+
         if analyze:
             return ma.TwoD_Analysis(
                 label='Qubit_dac_scan',
@@ -4472,6 +5248,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
     def _measure_spectroscopy_CW(
             self,
+            cw_spec_power,
             freqs,
             MC: Optional[MeasurementControl] = None,
             analyze=True,
@@ -4493,7 +5270,20 @@ class HAL_Transmon(HAL_ShimSQ):
             label (str):
                 suffix to append to the measurement label
         """
+
+        init_mw_mixer_offs_GI = self.mw_mixer_offs_GI()
+        init_mw_mixer_offs_GQ = self.mw_mixer_offs_GQ()
+        init_spec_pow = self.spec_pow()
+
+        print(f"Setting qubit {self.name} MW mixer offsets to zero ...")
+        self.mw_mixer_offs_GI(0.0)
+        self.mw_mixer_offs_GQ(0.0)
+        self.prepare_for_timedomain()
+
         if prepare_for_continuous_wave:
+            if cw_spec_power != None:
+                print(f"Setting CW source power level ...")
+                self.spec_pow(cw_spec_power)
             self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -4523,6 +5313,82 @@ class HAL_Transmon(HAL_ShimSQ):
         else:
             self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
             MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='CW_spectroscopy' + self.msmt_suffix + label)
+
+        self.hal_acq_spec_mode_off()
+
+        print(f"Setting qubit {self.name} MW mixer offsets back to ther initial value ...")
+        self.mw_mixer_offs_GI(init_mw_mixer_offs_GI)
+        self.mw_mixer_offs_GQ(init_mw_mixer_offs_GQ)
+        self.prepare_for_timedomain()
+
+        if prepare_for_continuous_wave:
+            if cw_spec_power != None:
+                print(f"Setting CW source power level to initial value ...")
+                self.spec_pow(init_spec_pow)
+                self.prepare_for_continuous_wave()
+
+        if analyze:
+            ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+
+    def measure_spectroscopy_CW_ramzz(
+            self,
+            freqs,
+            measurement_qubit,
+            ramzz_wait_time_ns,
+            MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            close_fig=True,
+            label='',
+            prepare_for_continuous_wave=True):
+        """
+        Does a CW spectroscopy experiment by sweeping the frequency of a
+        microwave source.
+
+        Relevant qubit parameters:
+            instr_spec_source (RohdeSchwarz_SGS100A):
+                instrument used to apply CW excitation
+
+            spec_pow (float):
+                power of the MW excitation at the output of the spec_source (dBm)
+                FIXME: parameter disappeared, and power not set
+
+            label (str):
+                suffix to append to the measurement label
+        """
+        if prepare_for_continuous_wave:
+            self.prepare_for_continuous_wave()
+            measurement_qubit.prepare_for_timedomain()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        self.hal_acq_spec_mode_on()
+
+        p = sqo.pulsed_spec_seq_ramzz(
+            qubit_idx=self.cfg_qubit_nr(),
+            measured_qubit_idx = measurement_qubit.cfg_qubit_nr(),
+            ramzz_wait_time_ns = ramzz_wait_time_ns,
+            spec_pulse_length=self.spec_pulse_length(),
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
+
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+        # CC gets started in the int_avg detector
+
+        spec_source = self.instr_spec_source.get_instr()
+        spec_source.on()
+        # Set marker mode off for CW:
+        if not spec_source.get_idn()['model'] == 'E8257D':  # FIXME: HW dependency on old HP/Keysight model
+            spec_source.pulsemod_state('Off')
+
+        MC.set_sweep_function(spec_source.frequency)
+        MC.set_sweep_points(freqs)
+        if self.cfg_spec_mode():
+            print('Enter loop')
+            MC.set_detector_function(measurement_qubit.UHFQC_spec_det)
+        else:
+            measurement_qubit.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+            MC.set_detector_function(measurement_qubit.int_avg_det_single)
         MC.run(name='CW_spectroscopy' + self.msmt_suffix + label)
 
         self.hal_acq_spec_mode_off()
@@ -5235,7 +6101,8 @@ class HAL_Transmon(HAL_ShimSQ):
             MC: Optional[MeasurementControl] = None,
             analyze: bool = True,
             prepare: bool = True,
-            Pulse_comb: list=['off', 'on']
+            Pulse_comb: list=['off', 'on'],
+            LO_freq_mod = -100e6
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs
@@ -5252,6 +6119,14 @@ class HAL_Transmon(HAL_ShimSQ):
             freqs (array):
                 sweeped range of ro_freq
         """
+
+        print(f'Setting {self.instr_LutMan_RO()} to None value ...')
+        RO_lutman = self.find_instrument(self.instr_LutMan_RO())
+        old_LO_freq = RO_lutman.LO_freq()
+        RO_lutman.LO_freq(None)
+
+        self.ro_freq_mod(LO_freq_mod)
+        self.prepare_readout()
 
         # docstring from parent class
         if MC is None:
@@ -5303,8 +6178,16 @@ class HAL_Transmon(HAL_ShimSQ):
             # Dispersive shift from peak finder
             print('dispersive shift is {} MHz'.format(
                 a.qoi['dispersive_shift'] * 1e-6))
+            
+            print(f'Setting {self.instr_LutMan_RO()} to its previous value ...')
+            RO_lutman.LO_freq(old_LO_freq)
+            self.prepare_readout()
 
             return True
+        
+        print(f'Setting {self.instr_LutMan_RO()} to its previous value ...')
+        RO_lutman.LO_freq(old_LO_freq)
+        self.prepare_readout()
 
     def measure_error_fraction(
             self,
@@ -5840,8 +6723,8 @@ class HAL_Transmon(HAL_ShimSQ):
             prepare_for_timedomain: bool = True,
             ignore_f_cal_pts: bool = False,
             compile_only: bool = False,
-            rb_tasks=None
-    ):
+            rb_tasks=None,
+            disable_metadata = False):
         # USED_BY: inspire_dependency_graph.py,
         """
         Measures randomized benchmarking decay including second excited state
@@ -5929,7 +6812,7 @@ class HAL_Transmon(HAL_ShimSQ):
             # Using `with ...:` makes sure the other processes will be terminated
             # avoid starting too mane processes,
             # nr_processes = None will start as many as the PC can handle
-            nr_processes = None if recompile else 1
+            nr_processes = os.cpu_count() // 2 if recompile else 1
             with multiprocessing.Pool(nr_processes) as pool:
                 rb_tasks = send_rb_tasks(pool)
                 cl_oql.wait_for_rb_tasks(rb_tasks)
@@ -5960,18 +6843,19 @@ class HAL_Transmon(HAL_ShimSQ):
         d.prepare_function_kwargs = prepare_function_kwargs
         d.nr_shots = reps_per_seed * len(sweep_points)
         MC.set_detector_function(d)
-        MC.run('RB_{}seeds'.format(nr_seeds) + self.msmt_suffix, exp_metadata={'bins': sweep_points})
+        MC.run('RB_{}seeds'.format(nr_seeds) + self.msmt_suffix, exp_metadata={'bins': sweep_points},
+                disable_snapshot_metadata = disable_metadata)
 
         a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
             label='RB_',
             rates_I_quad_ch_idx=0,
             cal_pnts_in_dset=np.repeat(["0", "1", "2"], 2)
         )
-
+        
         for key in a.proc_data_dict['quantities_of_interest'].keys():
             if 'eps_simple_lin_trans' in key:
                 self.F_RB((1-a.proc_data_dict['quantities_of_interest'][key].n)**(1/1.875))
-
+        
         return True
 
 
@@ -6060,8 +6944,8 @@ class HAL_Transmon(HAL_ShimSQ):
             label: str = '',
             analyze=True,
             close_fig=True,
-            prepare_for_timedomain=True
-    ):
+            prepare_for_timedomain=True,
+            disable_metadata = False):
         """
         Measures a rabi oscillation of the ef/12 transition.
 
@@ -6081,7 +6965,8 @@ class HAL_Transmon(HAL_ShimSQ):
         p = sqo.ef_rabi_seq(
             self.cfg_qubit_nr(),
             amps=amps, recovery_pulse=recovery_pulse,
-            platf_cfg=self.cfg_openql_platform_fn()
+            platf_cfg=self.cfg_openql_platform_fn(),
+            add_cal_points=False
         )
 
         s = swf.OpenQL_Sweep(
@@ -6096,7 +6981,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points_2D(anharmonicity)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('ef_rabi_2D' + label + self.msmt_suffix, mode='2D')
+        MC.run('ef_rabi_2D' + label + self.msmt_suffix, mode='2D', disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             a = ma.TwoD_Analysis()
@@ -6111,7 +6996,8 @@ class HAL_Transmon(HAL_ShimSQ):
             label: str = '',
             analyze=True,
             close_fig=True,
-            prepare_for_timedomain=True
+            prepare_for_timedomain=True,
+            disable_metadata = False
     ):
         """
         Measures a rabi oscillation of the ef/12 transition.
@@ -6146,7 +7032,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(p.sweep_points)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('ef_rabi' + label + self.msmt_suffix)
+        MC.run('ef_rabi' + label + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             a2 = ma2.EFRabiAnalysis(close_figs=True, label='ef_rabi')

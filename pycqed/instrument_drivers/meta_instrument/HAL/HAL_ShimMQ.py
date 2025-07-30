@@ -167,7 +167,8 @@ class HAL_ShimMQ(Instrument):
                 fl_lutman = qb.instr_LutMan_Flux.get_instr()
                 fl_lutman.load_waveforms_onto_AWG_lookuptable()
             except Exception as e:
-                warnings.warn(f"Could not load flux pulses for {qb}, exception '{e}'")
+                warnings.warn("Could not load flux pulses for {}".format(qb))
+                warnings.warn("Exception {}".format(e))
 
     def prepare_readout(self, qubits, reduced: bool = False):
         """
@@ -182,10 +183,11 @@ class HAL_ShimMQ(Instrument):
             self._prep_ro_sources(qubits=qubits)
 
         self._prep_ro_assign_weights(qubits=qubits)  # NB: sets self.acq_ch_map
-        self._prep_ro_integration_weights(qubits=qubits)
+        self._prep_ro_integration_weights(qubits=qubits) # Note: also sets thresholds! LDC.
+
         if not reduced:
             self._prep_ro_pulses(qubits=qubits)
-            # self._prep_ro_instantiate_detectors() # FIXME: unused
+            self._prep_ro_instantiate_detectors()
 
         # TODO:
         # - update global readout parameters (relating to mixer settings)
@@ -239,12 +241,54 @@ class HAL_ShimMQ(Instrument):
 
         # self._prep_td_configure_VSM()
 
-    # FIXME: setup dependent
     def prepare_for_inspire(self):
-        for lutman in ['mw_lutman_QNW','mw_lutman_QNE','mw_lutman_QC','mw_lutman_QSW','mw_lutman_QSE']:
-            self.find_instrument(lutman).set_inspire_lutmap()
+        from datetime import datetime
+        # LDC. Trying to ensure readout is digitized, uses optimal weights, and does single shots w/o averaging
+        self.ro_acq_digitized(True)
+        self.ro_acq_weight_type('optimal')
+        #self.ro_acq_averages(1)
+
+        for qubit in self.qubits():
+            QUBIT = self.find_instrument(qubit)
+            qubit_lutman = self.find_instrument(QUBIT.instr_LutMan_MW())
+            qubit_lutman.set_default_lutmap()
+        
         self.prepare_for_timedomain(qubits=self.qubits())
-        self.find_instrument(self.instr_MC()).soft_avg(1)
+
+        # LDC hack for Quantum Inspire. 2022/07/04
+        # This hot fix addresses the problem that the UHFs are not dividing by the right number of averages.
+        # They seem to be normalizing by the number of averages in the PREVIOUS run.
+        # This way, we set the averages twice. This is the first time.
+        for readout_instrument in [self.instr_acq_0(),
+                                   self.instr_acq_1(),
+                                   self.instr_acq_2()]:
+            if readout_instrument == None:
+                pass
+            else:
+                RO_INSTRUMENT = self.find_instrument(readout_instrument)
+                RO_INSTRUMENT.qas_0_result_averages(1)
+
+        self.find_instrument(self.instr_MC()).soft_avg(1)   
+
+        # RDC 06-04-2023
+        # Save the metadata with PrepInspi
+        from pycqed.measurement import measurement_control
+        MC = self.find_instrument(self.instr_MC())
+        
+        name = 'System_snapshot'
+        MC._set_measurement_name(name)
+        ######################
+        with measurement_control.h5d.Data(
+            name=MC._get_measurement_name(), datadir=MC.datadir()
+        ) as MC.data_object:
+            date_str = MC._get_measurement_begintime()
+
+            dt = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+            snapshot_timestamp = dt.strftime('%Y%m%d_%H%M%S')
+            self.latest_snapshot_timestamp(snapshot_timestamp)
+
+            MC._save_instrument_settings(MC.data_object)
+
         return True
 
     ##########################################################################
@@ -326,6 +370,7 @@ class HAL_ShimMQ(Instrument):
     def get_int_logging_detector(
             self,
             qubits=None,
+            integration_length = 1e-6,
             result_logging_mode='raw'
     ) -> Multi_Detector:
         # FIXME: qubits passed to but not used in function
@@ -355,6 +400,7 @@ class HAL_ShimMQ(Instrument):
             # channel_dict = {}
             # for q in qubits:
 
+            # added by rdc 07/03/2023
             UHFQC = self.find_instrument(acq_instr_name)
             int_log_dets.append(
                 det.UHFQC_integration_logging_det(
@@ -408,7 +454,7 @@ class HAL_ShimMQ(Instrument):
         return input_average_detector
 
 
-    def get_int_avg_det(self, **kw) -> Multi_Detector:
+    def get_int_avg_det(self, integration_length = 1e-6,**kw) -> Multi_Detector:
         """
         Create an multi detector based integration average detector.
 
@@ -436,6 +482,7 @@ class HAL_ShimMQ(Instrument):
                 CC = self.instr_CC.get_instr()
             else:
                 CC = None
+
             int_avg_dets.append(
                 det.UHFQC_integrated_average_detector(
                     channels=list(acq_ch_map[acq_instr_name].values()),
@@ -595,6 +642,43 @@ class HAL_ShimMQ(Instrument):
                       "independent of codeword received.",
             parameter_class=ManualParameter,
             vals=vals.Bool(),
+        )
+
+        # ADDED BY RDC 22-03-2023
+        self.add_parameter(
+            "hidden_init",
+            docstring="If true, it does postselection using the hidden initialization "
+                      "in execution.py.",
+            parameter_class=ManualParameter,
+            vals=vals.Bool(),
+            initial_value = True,
+        )
+
+        # ADDED BY RDC 04-04-2023
+        self.add_parameter(
+            "disable_metadata_online",
+            docstring="If true, it does NOT save metadata for quantum inspire" 
+                      "shots when the system is online"
+                      "in execution.py.",
+            parameter_class=ManualParameter,
+            vals=vals.Bool(),
+            initial_value = False,
+        )
+
+        self.add_parameter(
+            "use_online_settings",
+            docstring="If True, it uses HAL_ShimMQ.py lines for Quantum Inspire",
+            parameter_class=ManualParameter,
+            vals=vals.Bool(),
+            initial_value = False,
+        )
+
+        self.add_parameter(
+            "latest_snapshot_timestamp",
+            docstring="If true, it does postselection using the hidden initialization "
+                      "in execution.py.",
+            parameter_class=ManualParameter,
+            vals=vals.Strings()
         )
 
     def _add_parameters(self):
@@ -765,6 +849,27 @@ class HAL_ShimMQ(Instrument):
         """
         log.info("Setting integration weights")
 
+        #########################
+        #########################
+        #Added by LDC. 2022/07/07
+        #The goal here is to set the thresholds of UNUSED channels so high that the result is always 0.
+        #We first set all thresholds for all channels very high (30).
+        #Note that the thresholds of USED channels are overwritten to their true values further down.
+        UHFQCs=[]
+        for qb_name in qubits:
+            qb = self.find_instrument(qb_name)
+            thisUHF=qb.instr_acquisition.get_instr()
+            if thisUHF not in UHFQCs:
+                UHFQCs.append(thisUHF)
+        for thisUHF in UHFQCs:
+            #print("got here!")
+            for i in range(10):
+                thisUHF.set(f"qas_0_thresholds_{i}_level", 30)
+        #### NEED TO TEST!!!!!!!!
+        #########################
+        #########################
+
+
         if self.ro_acq_weight_type() == "SSB":
             log.info("using SSB weights")
             for qb_name in qubits:
@@ -792,8 +897,8 @@ class HAL_ShimMQ(Instrument):
                 else:
                     acq_instr.set("qas_0_integration_weights_{}_real".format(qb.ro_acq_weight_chI()), opt_WI,)
                     acq_instr.set("qas_0_integration_weights_{}_imag".format(qb.ro_acq_weight_chI()), opt_WQ,)
-                    acq_instr.set("qas_0_rotations_{}".format(
-                                qb.ro_acq_weight_chI()), 1.0 - 1.0j)
+                    acq_instr.set("qas_0_rotations_{}".format(qb.ro_acq_weight_chI()), 1.0 - 1.0j)
+                    
                     if self.ro_acq_weight_type() == 'optimal IQ':
                         print('setting the optimal Q')
                         acq_instr.set('qas_0_integration_weights_{}_real'.format(qb.ro_acq_weight_chQ()), opt_WQ)
@@ -801,6 +906,7 @@ class HAL_ShimMQ(Instrument):
                         acq_instr.set('qas_0_rotations_{}'.format(qb.ro_acq_weight_chQ()), 1.0 + 1.0j)
 
                 if self.ro_acq_digitized():
+
                     # Update the RO theshold
                     if (qb.ro_acq_rotated_SSB_when_optimal() and
                             abs(qb.ro_acq_threshold()) > 32):
@@ -877,25 +983,29 @@ class HAL_ShimMQ(Instrument):
 
             # FIXME: temporary fix so device object doesnt mess with
             #       the resonator combinations. Better strategy should be implemented
-            ro_lm.resonator_combinations(resonator_combs)
+            if self.use_online_settings() == False:
+                ro_lm.resonator_combinations(resonator_combs)
+            else:
+                pass
+
             ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
 
     # FIXME: unused
-    # def _prep_ro_instantiate_detectors(self):
-    #     """
-    #     Instantiate acquisition detectors.
-    #     """
-    #     # log.info("Instantiating readout detectors")
-    #     # self.input_average_detector = self.get_input_avg_det()  # FIXME: unused
-    #     # self.int_avg_det = self.get_int_avg_det()  # FIXME: unused
-    #     # self.int_avg_det_single = self.get_int_avg_det(single_int_avg=True) # FIXME: unused
-    #     # self.int_log_det = self.get_int_logging_detector()  # FIXME: unused
+    def _prep_ro_instantiate_detectors(self):
+        """
+        Instantiate acquisition detectors.
+        """
+        log.info("Instantiating readout detectors")
+        # self.input_average_detector = self.get_input_avg_det()  # FIXME: unused
+        # self.int_avg_det = self.get_int_avg_det()  # FIXME: unused
+        self.int_avg_det_single = self.get_int_avg_det(single_int_avg=True)
+        # self.int_log_det = self.get_int_logging_detector()  # FIXME: unused
 
-    #     # FIXME: unused
-    #     # if len(qubits) == 2 and self.ro_acq_weight_type() == 'optimal':
-    #     #     self.corr_det = self.get_correlation_detector(qubits=qubits)
-    #     # else:
-    #     #     self.corr_det = None
+        # FIXME: unused
+        # if len(qubits) == 2 and self.ro_acq_weight_type() == 'optimal':
+        #     self.corr_det = self.get_correlation_detector(qubits=qubits)
+        # else:
+        #     self.corr_det = None
 
 
     @deprecated(version='0.4', reason="VSM support is broken")

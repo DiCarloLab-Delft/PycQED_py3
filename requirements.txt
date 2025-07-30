@@ -18,8 +18,6 @@ matplotlib
 autodepgraph
 networkx
 spirack
-zhinst-core
-zhinst-utils; python_version > '3.6'
 packaging
 deprecated
 pytest
@@ -40,6 +38,17 @@ pygsti==0.9.6  # FIXME: 0.9.7.5 breaks test_gst.py
 pyvisa>=1.8
 plotly<3.8  # FIXME: removing version constraint breaks test_gst.py
 pytest
+
+# Versions that were later on found to be working on Starmon-7 with Python 3.9
+qutechopenql==0.12.2
+qcodes_loop==0.1.3
+qutip==4.7.3
+pyvisa-py
+pythonnet
+zhinst==21.8.20515
+graphviz==0.16
+qcodes==0.42.1
+adaptive==1.1.0
 
 
 # cmake

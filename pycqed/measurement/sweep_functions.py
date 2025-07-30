@@ -463,13 +463,14 @@ class RO_freq_sweep(Soft_Sweep):
         self.idx = idx
 
     def set_parameter(self, val):
-        LO_freq = self.ro_lm.LO_freq()
-        IF_freq = val - LO_freq
+        # LO_freq = self.qubit.ro_freq() - self.qubit.ro_freq_mod()
+        # LO_freq = self.ro_lm.LO_freq()
+        # IF_freq = val - LO_freq
 
         # Parameter 1 will be qubit.ro_freq()
-        # self.qubit.ro_freq.set(val)
+        self.qubit.ro_freq.set(val)
         # Parameter 2 will be qubit.ro_freq_mod()
-        self.qubit.ro_freq_mod.set(IF_freq)
+        # self.qubit.ro_freq_mod.set(IF_freq)
 
         # self.ro_lm.set('M_modulation_R{}'.format(self.idx), IF_freq)
         # self.ro_lm.load_waveforms_onto_AWG_lookuptable()

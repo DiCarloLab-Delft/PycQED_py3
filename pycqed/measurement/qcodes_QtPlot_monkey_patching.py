@@ -75,9 +75,8 @@ import inspect
 
 # Below: patch the QtPlot method to allow for setting a fixed color scale range
 
-import qcodes
-from qcodes_loop.plots.pyqtgraph import QtPlot
 import qcodes_loop
+from qcodes_loop.plots.pyqtgraph import QtPlot
 
 
 def dummy_func(hist, **kwargs):

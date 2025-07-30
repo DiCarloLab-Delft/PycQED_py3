@@ -10,170 +10,131 @@ from qcodes.utils import validators as vals
 from pycqed.measurement.waveform_control_CC import waveform as wf
 
 default_mw_lutmap = {
-    0  : {"name" : "I"     , "theta" : 0        , "phi" : 0 , "type" : "ge"},
-    1  : {"name" : "rX180" , "theta" : 180      , "phi" : 0 , "type" : "ge"},
-    2  : {"name" : "rY180" , "theta" : 180      , "phi" : 90, "type" : "ge"},
-    3  : {"name" : "rX90"  , "theta" : 90       , "phi" : 0 , "type" : "ge"},
-    4  : {"name" : "rY90"  , "theta" : 90       , "phi" : 90, "type" : "ge"},
-    5  : {"name" : "rXm90" , "theta" : -90      , "phi" : 0 , "type" : "ge"},
-    6  : {"name" : "rYm90" , "theta" : -90      , "phi" : 90, "type" : "ge"},
-    7  : {"name" : "rPhi90", "theta" : 90       , "phi" : 0 , "type" : "ge"},
-    8  : {"name" : "spec"  , "type"  : "spec"}  ,
-    9  : {"name" : "rX12"  , "theta" : 180      , "phi" : 0 , "type" : "ef"},
-    10 : {"name" : "square", "type"  : "square"},
-    11 : {"name" : "rY45"  , "theta" : 45       , "phi" : 90, "type" : "ge"},
-    12 : {"name" : "rYm45" , "theta" : -45      , "phi" : 90, "type" : "ge"},
-    13 : {"name" : "rX45"  , "theta" : 45       , "phi" : 0 , "type" : "ge"},
-    14 : {"name" : "rXm45" , "theta" : -45      , "phi" : 0 , "type" : "ge"},
-    15 : {"name" : "rX12_90"  , "theta" : 90, "phi" : 0 , "type" : "ef"},
-    30 : {"name" : "rPhi180" , "theta" : 180    , "phi" : 0 , "type" : "ge"},
-    52 : {"name" : "phaseCorrPark1" , "type" : "phase"},
-    53 : {"name" : "phaseCorrPark2" , "type" : "phase"},
-    54 : {"name" : "phaseCorrPark3" , "type" : "phase"},
-    55 : {"name" : "phaseCorrPark4" , "type" : "phase"},
-    56 : {"name" : "phaseCorrPark5" , "type" : "phase"},
-    57 : {"name" : "phaseCorrPark6" , "type" : "phase"},
-    58 : {"name" : "phaseCorrPark7" , "type" : "phase"},
-    59 : {"name" : "phaseCorrPark8" , "type" : "phase"},
-    60 : {"name" : "phaseCorrNW" , "type" : "phase"},
-    61 : {"name" : "phaseCorrNE" , "type" : "phase"},
-    62 : {"name" : "phaseCorrSW" , "type" : "phase"},
-    63 : {"name" : "phaseCorrSE" , "type" : "phase"},
-}
-
-inspire_mw_lutmap = {
-    0  : {"name" : "I"     , "theta" : 0        , "phi" : 0  , "type" : "ge"}, # I for CW compatibility
-    1  : {"name" : "rX180" , "theta" : 180      , "phi" : 0  , "type" : "ge"}, # rX180 for CW compatibility
-    2  : {"name" : "rY180" , "theta" : 180      , "phi" : 90 , "type" : "ge"}, # rY180 for CW compatibility
-    3  : {"name" : "rX90"  , "theta" : 90       , "phi" : 0  , "type" : "ge"}, # rX90 for CW compatibility
-    4  : {"name" : "rY90"  , "theta" : 90       , "phi" : 90 , "type" : "ge"}, # rY90 for CW compatibility
-    5  : {"name" : "rX270" , "theta" : 270      , "phi" : 0  , "type" : "ge"}, # rXm90 for CW compatibility
-    6  : {"name" : "rY270" , "theta" : 270      , "phi" : 90 , "type" : "ge"}, # rYm90 for CW compatibility
-    7  : {"name" : "rX5"   , "theta" : 5.625    , "phi" : 0  , "type" : "ge"},
-    8  : {"name" : "rX11"  , "theta" : 11.25    , "phi" : 0  , "type" : "ge"},
-    9  : {"name" : "rX12"  , "theta" : 180      , "phi" : 0  , "type" : "ef"}, # rX12 for CW compatibility
-    10 : {"name" : "rX16"  , "theta" : 16.875   , "phi" : 0  , "type" : "ge"},
-    11 : {"name" : "rY45"  , "theta" : 45       , "phi" : 90 , "type" : "ge"}, # rY45 for CW compatibility
-    12 : {"name" : "rY315" , "theta" : -45      , "phi" : 90 , "type" : "ge"}, # rYm45 for CW compatibility
-    13 : {"name" : "rX45"  , "theta" : 45       , "phi" : 0  , "type" : "ge"}, # rX45 for CW compatibility
-    14 : {"name" : "rX315" , "theta" : -45      , "phi" : 0  , "type" : "ge"}, # rXm45 for CW compatibility
-    15 : {"name" : "rX22"  , "theta" : 22.5     , "phi" : 0  , "type" : "ge"},
-    16 : {"name" : "rX28"  , "theta" : 28.125   , "phi" : 0  , "type" : "ge"},
-    17 : {"name" : "rX33"  , "theta" : 33.75    , "phi" : 0  , "type" : "ge"},
-    18 : {"name" : "rX39"  , "theta" : 39.375   , "phi" : 0  , "type" : "ge"},
-    19 : {"name" : "rX50"  , "theta" : 50.625   , "phi" : 0  , "type" : "ge"},
-    20 : {"name" : "rX56"  , "theta" : 56.25    , "phi" : 0  , "type" : "ge"},
-    21 : {"name" : "rX61"  , "theta" : 61.875   , "phi" : 0  , "type" : "ge"},
-    22 : {"name" : "rX67"  , "theta" : 67.5     , "phi" : 0  , "type" : "ge"},
-    23 : {"name" : "rX73"  , "theta" : 73.125   , "phi" : 0  , "type" : "ge"},
-    24 : {"name" : "rX78"  , "theta" : 78.75    , "phi" : 0  , "type" : "ge"},
-    25 : {"name" : "rX84"  , "theta" : 84.375   , "phi" : 0  , "type" : "ge"},
-    26 : {"name" : "rX95"  , "theta" : 95.625   , "phi" : 0  , "type" : "ge"},
-    27 : {"name" : "rX101" , "theta" : 101.25   , "phi" : 0  , "type" : "ge"},
-    28 : {"name" : "rX106" , "theta" : 106.875  , "phi" : 0  , "type" : "ge"},
-    29 : {"name" : "rX112" , "theta" : 112.5    , "phi" : 0  , "type" : "ge"},
-    30 : {"name" : "rX118" , "theta" : 118.125  , "phi" : 0  , "type" : "ge"},
-    31 : {"name" : "rX123" , "theta" : 123.75   , "phi" : 0  , "type" : "ge"},
-    32 : {"name" : "rX129" , "theta" : 129.375  , "phi" : 0  , "type" : "ge"},
-    33 : {"name" : "rX135" , "theta" : 135      , "phi" : 0  , "type" : "ge"},
-    34 : {"name" : "rX140" , "theta" : 140.625  , "phi" : 0  , "type" : "ge"},
-    35 : {"name" : "rX146" , "theta" : 146.25   , "phi" : 0  , "type" : "ge"},
-    36 : {"name" : "rX151" , "theta" : 151.875  , "phi" : 0  , "type" : "ge"},
-    37 : {"name" : "rX157" , "theta" : 157.5    , "phi" : 0  , "type" : "ge"},
-    38 : {"name" : "rX163" , "theta" : 163.125  , "phi" : 0  , "type" : "ge"},
-    39 : {"name" : "rX168" , "theta" : 168.75   , "phi" : 0  , "type" : "ge"},
-    40 : {"name" : "rX174" , "theta" : 174.375  , "phi" : 0  , "type" : "ge"},
-    41 : {"name" : "rX185" , "theta" : -174.375 , "phi" : 0  , "type" : "ge"},
-    42 : {"name" : "rX191" , "theta" : -168.75  , "phi" : 0  , "type" : "ge"},
-    43 : {"name" : "rX196" , "theta" : -163.125 , "phi" : 0  , "type" : "ge"},
-    44 : {"name" : "rX202" , "theta" : -157.5   , "phi" : 0  , "type" : "ge"},
-    45 : {"name" : "rX208" , "theta" : -151.875 , "phi" : 0  , "type" : "ge"},
-    46 : {"name" : "rX213" , "theta" : -146.25  , "phi" : 0  , "type" : "ge"},
-    47 : {"name" : "rX219" , "theta" : -140.625 , "phi" : 0  , "type" : "ge"},
-    48 : {"name" : "rX225" , "theta" : -135     , "phi" : 0  , "type" : "ge"},
-    49 : {"name" : "rX230" , "theta" : -129.375 , "phi" : 0  , "type" : "ge"},
-    50 : {"name" : "rX236" , "theta" : -123.75  , "phi" : 0  , "type" : "ge"},
-    51 : {"name" : "rX241" , "theta" : -118.125 , "phi" : 0  , "type" : "ge"},
-    52 : {"name" : "rX247" , "theta" : -112.5   , "phi" : 0  , "type" : "ge"},
-    53 : {"name" : "rX253" , "theta" : -106.875 , "phi" : 0  , "type" : "ge"},
-    54 : {"name" : "rX258" , "theta" : -101.25  , "phi" : 0  , "type" : "ge"},
-    55 : {"name" : "rX264" , "theta" : -95.625  , "phi" : 0  , "type" : "ge"},
-    56 : {"name" : "rX275" , "theta" : -84.375  , "phi" : 0  , "type" : "ge"},
-    57 : {"name" : "rX281" , "theta" : -78.75   , "phi" : 0  , "type" : "ge"},
-    58 : {"name" : "rX286" , "theta" : -73.125  , "phi" : 0  , "type" : "ge"},
-    59 : {"name" : "rX292" , "theta" : -67.5    , "phi" : 0  , "type" : "ge"},
-    60 : {"name" : "rX298" , "theta" : -61.875  , "phi" : 0  , "type" : "ge"},
-    61 : {"name" : "rX303" , "theta" : -56.25   , "phi" : 0  , "type" : "ge"},
-    62 : {"name" : "rX309" , "theta" : -50.625  , "phi" : 0  , "type" : "ge"},
-    63 : {"name" : "rX320" , "theta" : -39.375  , "phi" : 0  , "type" : "ge"},
-    64 : {"name" : "rX326" , "theta" : -33.75   , "phi" : 0  , "type" : "ge"},
-    65 : {"name" : "rX331" , "theta" : -28.125  , "phi" : 0  , "type" : "ge"},
-    66 : {"name" : "rX337" , "theta" : -22.5    , "phi" : 0  , "type" : "ge"},
-    67 : {"name" : "rX343" , "theta" : -16.875  , "phi" : 0  , "type" : "ge"},
-    68 : {"name" : "rX348" , "theta" : -11.25   , "phi" : 0  , "type" : "ge"},
-    69 : {"name" : "rX354" , "theta" : -5.625   , "phi" : 0  , "type" : "ge"},
-    70 : {"name" : "rY5"   , "theta" : 5.625    , "phi" : 90 , "type" : "ge"},
-    71 : {"name" : "rY11"  , "theta" : 11.25    , "phi" : 90 , "type" : "ge"},
-    72 : {"name" : "rY16"  , "theta" : 16.875   , "phi" : 90 , "type" : "ge"},
-    73 : {"name" : "rY22"  , "theta" : 22.5     , "phi" : 90 , "type" : "ge"},
-    74 : {"name" : "rY28"  , "theta" : 28.125   , "phi" : 90 , "type" : "ge"},
-    75 : {"name" : "rY33"  , "theta" : 33.75    , "phi" : 90 , "type" : "ge"},
-    76 : {"name" : "rY39"  , "theta" : 39.375   , "phi" : 90 , "type" : "ge"},
-    77 : {"name" : "rY50"  , "theta" : 50.625   , "phi" : 90 , "type" : "ge"},
-    78 : {"name" : "rY56"  , "theta" : 56.25    , "phi" : 90 , "type" : "ge"},
-    79 : {"name" : "rY61"  , "theta" : 61.875   , "phi" : 90 , "type" : "ge"},
-    80 : {"name" : "rY67"  , "theta" : 67.5     , "phi" : 90 , "type" : "ge"},
-    81 : {"name" : "rY73"  , "theta" : 73.125   , "phi" : 90 , "type" : "ge"},
-    82 : {"name" : "rY78"  , "theta" : 78.75    , "phi" : 90 , "type" : "ge"},
-    83 : {"name" : "rY84"  , "theta" : 84.375   , "phi" : 90 , "type" : "ge"},
-    84 : {"name" : "rY95"  , "theta" : 95.625   , "phi" : 90 , "type" : "ge"},
-    85 : {"name" : "rY101" , "theta" : 101.25   , "phi" : 90 , "type" : "ge"},
-    86 : {"name" : "rY106" , "theta" : 106.875  , "phi" : 90 , "type" : "ge"},
-    87 : {"name" : "rY112" , "theta" : 112.5    , "phi" : 90 , "type" : "ge"},
-    88 : {"name" : "rY118" , "theta" : 118.125  , "phi" : 90 , "type" : "ge"},
-    89 : {"name" : "rY123" , "theta" : 123.75   , "phi" : 90 , "type" : "ge"},
-    90 : {"name" : "rY129" , "theta" : 129.375  , "phi" : 90 , "type" : "ge"},
-    91 : {"name" : "rY135" , "theta" : 135      , "phi" : 90 , "type" : "ge"},
-    92 : {"name" : "rY140" , "theta" : 140.625  , "phi" : 90 , "type" : "ge"},
-    93 : {"name" : "rY146" , "theta" : 146.25   , "phi" : 90 , "type" : "ge"},
-    94 : {"name" : "rY151" , "theta" : 151.875  , "phi" : 90 , "type" : "ge"},
-    95 : {"name" : "rY157" , "theta" : 157.5    , "phi" : 90 , "type" : "ge"},
-    96 : {"name" : "rY163" , "theta" : 163.125  , "phi" : 90 , "type" : "ge"},
-    97 : {"name" : "rY168" , "theta" : 168.75   , "phi" : 90 , "type" : "ge"},
-    98 : {"name" : "rY174" , "theta" : 174.375  , "phi" : 90 , "type" : "ge"},
-    99 : {"name" : "rY185" , "theta" : -174.375 , "phi" : 90 , "type" : "ge"},
-    100: {"name" : "rY191" , "theta" : -168.75  , "phi" : 90 , "type" : "ge"},
-    101: {"name" : "rY196" , "theta" : -163.125 , "phi" : 90 , "type" : "ge"},
-    102: {"name" : "rY202" , "theta" : -157.5   , "phi" : 90 , "type" : "ge"},
-    103: {"name" : "rY208" , "theta" : -151.875 , "phi" : 90 , "type" : "ge"},
-    104: {"name" : "rY213" , "theta" : -146.25  , "phi" : 90 , "type" : "ge"},
-    105: {"name" : "rY219" , "theta" : -140.625 , "phi" : 90 , "type" : "ge"},
-    106: {"name" : "rY225" , "theta" : -135     , "phi" : 90 , "type" : "ge"},
-    107: {"name" : "rY230" , "theta" : -129.375 , "phi" : 90 , "type" : "ge"},
-    108: {"name" : "rY236" , "theta" : -123.75  , "phi" : 90 , "type" : "ge"},
-    109: {"name" : "rY241" , "theta" : -118.125 , "phi" : 90 , "type" : "ge"},
-    110: {"name" : "rY247" , "theta" : -112.5   , "phi" : 90 , "type" : "ge"},
-    111: {"name" : "rY253" , "theta" : -106.875 , "phi" : 90 , "type" : "ge"},
-    112: {"name" : "rY258" , "theta" : -101.25  , "phi" : 90 , "type" : "ge"},
-    113: {"name" : "rY264" , "theta" : -95.625  , "phi" : 90 , "type" : "ge"},
-    114: {"name" : "rY275" , "theta" : -84.375  , "phi" : 90 , "type" : "ge"},
-    115: {"name" : "rY281" , "theta" : -78.75   , "phi" : 90 , "type" : "ge"},
-    116: {"name" : "rY286" , "theta" : -73.125  , "phi" : 90 , "type" : "ge"},
-    117: {"name" : "rY292" , "theta" : -67.5    , "phi" : 90 , "type" : "ge"},
-    118: {"name" : "rY298" , "theta" : -61.875  , "phi" : 90 , "type" : "ge"},
-    119: {"name" : "rY303" , "theta" : -56.25   , "phi" : 90 , "type" : "ge"},
-    120: {"name" : "rY309" , "theta" : -50.625  , "phi" : 90 , "type" : "ge"},
-    121: {"name" : "rY320" , "theta" : -39.375  , "phi" : 90 , "type" : "ge"},
-    122: {"name" : "rY326" , "theta" : -33.75   , "phi" : 90 , "type" : "ge"},
-    123: {"name" : "rY331" , "theta" : -28.125  , "phi" : 90 , "type" : "ge"},
-    124: {"name" : "rY337" , "theta" : -22.5    , "phi" : 90 , "type" : "ge"},
-    125: {"name" : "rY343" , "theta" : -16.875  , "phi" : 90 , "type" : "ge"},
-    126: {"name" : "rY348" , "theta" : -11.25   , "phi" : 90 , "type" : "ge"},
-    127: {"name" : "rY354" , "theta" : -5.625   , "phi" : 90 , "type" : "ge"}
+    0  : {"name": "i"     , "theta":    0     , "phi" :  0 , "type" : "ge"},
+    1  : {"name": "rx180" , "theta":  180     , "phi" : 0, "type" : "ge"},
+    2  : {"name": "rx45"  , "theta":   45     , "phi" :  0 , "type" : "ge"},  
+    3  : {"name": "ry45"  , "theta":   45     , "phi" : 90 , "type" : "ge"},
+    4  : {"name": "rx90"  , "theta":   90     , "phi" :  0 , "type" : "ge"},
+    5  : {"name": "ry90"  , "theta":   90     , "phi" : 90 , "type" : "ge"},
+    6  : {"name": "rx135" , "theta":  135     , "phi" :  0 , "type" : "ge"},
+    7  : {"name": "ry135" , "theta":  135     , "phi" : 90 , "type" : "ge"},
+    8  : {"name": "ry180" , "theta":  180     , "phi" : 90 , "type" : "ge"},
+    9  : {"name": "rx12"  , "theta":   180     , "phi" :  0 , "type" : "ef"},
+    10 : {"name": "rx225" , "theta": -135     , "phi" :  0 , "type" : "ge"},
+    11 : {"name": "ry225" , "theta": -135     , "phi" : 90 , "type" : "ge"},
+    12 : {"name": "rx270" , "theta":  -90     , "phi" :  0 , "type" : "ge"},
+    13 : {"name": "ry270" , "theta":  -90     , "phi" : 90 , "type" : "ge"},
+    14 : {"name": "rx315" , "theta":  -45     , "phi" :  0 , "type" : "ge"},
+    15 : {"name": "ry315" , "theta":  -45     , "phi" : 90 , "type" : "ge"},
+    16 : {"name": "rx6"   , "theta":    6.429 , "phi" :  0 , "type" : "ge"},
+    17 : {"name": "rx13"  , "theta":   12.857 , "phi" :  0 , "type" : "ge"},
+    18 : {"name": "rx19"  , "theta":   19.286 , "phi" :  0 , "type" : "ge"},
+    19 : {"name": "rx26"  , "theta":   25.714 , "phi" :  0 , "type" : "ge"},
+    20 : {"name": "rx32"  , "theta":   32.143 , "phi" :  0 , "type" : "ge"},
+    21 : {"name": "rx39"  , "theta":   38.571 , "phi" :  0 , "type" : "ge"},
+    22 : {"name": "rx51"  , "theta":   51.429 , "phi" :  0 , "type" : "ge"},
+    23 : {"name": "rx58"  , "theta":   57.857 , "phi" :  0 , "type" : "ge"},
+    24 : {"name": "rx64"  , "theta":   64.286 , "phi" :  0 , "type" : "ge"},
+    25 : {"name": "rx71"  , "theta":   70.714 , "phi" :  0 , "type" : "ge"},
+    26 : {"name": "rx77"  , "theta":   77.143 , "phi" :  0 , "type" : "ge"},
+    27 : {"name": "rx84"  , "theta":   83.571 , "phi" :  0 , "type" : "ge"},
+    28 : {"name": "rx96"  , "theta":   96.429 , "phi" :  0 , "type" : "ge"},
+    29 : {"name": "rx103" , "theta":  102.857 , "phi" :  0 , "type" : "ge"},
+    30 : {"name": "rx109" , "theta":  109.286 , "phi" :  0 , "type" : "ge"},
+    31 : {"name": "rx116" , "theta":  115.714 , "phi" :  0 , "type" : "ge"},
+    32 : {"name": "rx122" , "theta":  122.143 , "phi" :  0 , "type" : "ge"},
+    33 : {"name": "rx129" , "theta":  128.571 , "phi" :  0 , "type" : "ge"},
+    34 : {"name": "rx141" , "theta":  141.429 , "phi" :  0 , "type" : "ge"},
+    35 : {"name": "rx148" , "theta":  147.857 , "phi" :  0 , "type" : "ge"},
+    36 : {"name": "rx154" , "theta":  154.286 , "phi" :  0 , "type" : "ge"},
+    37 : {"name": "rx161" , "theta":  160.714 , "phi" :  0 , "type" : "ge"},
+    38 : {"name": "rx167" , "theta":  167.143 , "phi" :  0 , "type" : "ge"},
+    39 : {"name": "rx174" , "theta":  173.571 , "phi" :  0 , "type" : "ge"},
+    40 : {"name": "rx186" , "theta": -173.571 , "phi" :  0 , "type" : "ge"},
+    41 : {"name": "rx193" , "theta": -167.143 , "phi" :  0 , "type" : "ge"},
+    42 : {"name": "rx199" , "theta": -160.714 , "phi" :  0 , "type" : "ge"},
+    43 : {"name": "rx206" , "theta": -154.286 , "phi" :  0 , "type" : "ge"},
+    44 : {"name": "rx212" , "theta": -147.857 , "phi" :  0 , "type" : "ge"},
+    45 : {"name": "rx219" , "theta": -141.429 , "phi" :  0 , "type" : "ge"},
+    46 : {"name": "rx231" , "theta": -128.571 , "phi" :  0 , "type" : "ge"},
+    47 : {"name": "rx238" , "theta": -122.143 , "phi" :  0 , "type" : "ge"},
+    48 : {"name": "rx244" , "theta": -115.714 , "phi" :  0 , "type" : "ge"},
+    49 : {"name": "rx251" , "theta": -109.286 , "phi" :  0 , "type" : "ge"},
+    50 : {"name": "rx257" , "theta": -102.857 , "phi" :  0 , "type" : "ge"},
+    51 : {"name": "rx264" , "theta":  -96.429 , "phi" :  0 , "type" : "ge"},
+    52 : {"name": "rx276" , "theta":  -83.571 , "phi" :  0 , "type" : "ge"},
+    53 : {"name": "rx283" , "theta":  -77.143 , "phi" :  0 , "type" : "ge"},
+    54 : {"name": "rx289" , "theta":  -70.714 , "phi" :  0 , "type" : "ge"},
+    55 : {"name": "rx296" , "theta":  -64.286 , "phi" :  0 , "type" : "ge"},
+    56 : {"name": "rx302" , "theta":  -57.857 , "phi" :  0 , "type" : "ge"},
+    57 : {"name": "rx309" , "theta":  -51.429 , "phi" :  0 , "type" : "ge"},
+    58 : {"name": "rx321" , "theta":  -38.571 , "phi" :  0 , "type" : "ge"},
+    59 : {"name": "rx328" , "theta":  -32.143 , "phi" :  0 , "type" : "ge"},
+    60 : {"name": "rx334" , "theta":  -25.714 , "phi" :  0 , "type" : "ge"},
+    61 : {"name": "rx341" , "theta":  -19.286 , "phi" :  0 , "type" : "ge"},
+    62 : {"name": "rx347" , "theta":  -12.857 , "phi" :  0 , "type" : "ge"},
+    63 : {"name": "rx354" , "theta":   -6.429 , "phi" :  0 , "type" : "ge"},
+    64 : {"name": "ry6"   , "theta":    6.429 , "phi" : 90 , "type" : "ge"},
+    65 : {"name": "ry13"  , "theta":   12.857 , "phi" : 90 , "type" : "ge"},
+    66 : {"name": "ry19"  , "theta":   19.286 , "phi" : 90 , "type" : "ge"},
+    67 : {"name": "ry26"  , "theta":   25.714 , "phi" : 90 , "type" : "ge"},
+    68 : {"name": "ry32"  , "theta":   32.143 , "phi" : 90 , "type" : "ge"},
+    69 : {"name": "ry39"  , "theta":   38.571 , "phi" : 90 , "type" : "ge"},
+    70 : {"name": "ry51"  , "theta":   51.429 , "phi" : 90 , "type" : "ge"},
+    71 : {"name": "ry58"  , "theta":   57.857 , "phi" : 90 , "type" : "ge"},
+    72 : {"name": "ry64"  , "theta":   64.286 , "phi" : 90 , "type" : "ge"},
+    73 : {"name": "ry71"  , "theta":   70.714 , "phi" : 90 , "type" : "ge"},
+    74 : {"name": "ry77"  , "theta":   77.143 , "phi" : 90 , "type" : "ge"},
+    75 : {"name": "ry84"  , "theta":   83.571 , "phi" : 90 , "type" : "ge"},
+    76 : {"name": "ry96"  , "theta":   96.429 , "phi" : 90 , "type" : "ge"},
+    77 : {"name": "ry103" , "theta":  102.857 , "phi" : 90 , "type" : "ge"},
+    78 : {"name": "ry109" , "theta":  109.286 , "phi" : 90 , "type" : "ge"},
+    79 : {"name": "ry116" , "theta":  115.714 , "phi" : 90 , "type" : "ge"},
+    80 : {"name": "ry122" , "theta":  122.143 , "phi" : 90 , "type" : "ge"},
+    81 : {"name": "ry129" , "theta":  128.571 , "phi" : 90 , "type" : "ge"},
+    82 : {"name": "ry141" , "theta":  141.429 , "phi" : 90 , "type" : "ge"},
+    83 : {"name": "ry148" , "theta":  147.857 , "phi" : 90 , "type" : "ge"},
+    84 : {"name": "ry154" , "theta":  154.286 , "phi" : 90 , "type" : "ge"},
+    85 : {"name": "ry161" , "theta":  160.714 , "phi" : 90 , "type" : "ge"},
+    86 : {"name": "ry167" , "theta":  167.143 , "phi" : 90 , "type" : "ge"},
+    87 : {"name": "ry174" , "theta":  173.571 , "phi" : 90 , "type" : "ge"},
+    88 : {"name": "ry186" , "theta": -173.571 , "phi" : 90 , "type" : "ge"},
+    89 : {"name": "ry193" , "theta": -167.143 , "phi" : 90 , "type" : "ge"},
+    90 : {"name": "ry199" , "theta": -160.714 , "phi" : 90 , "type" : "ge"},
+    91 : {"name": "ry206" , "theta": -154.286 , "phi" : 90 , "type" : "ge"},
+    92 : {"name": "ry212" , "theta": -147.857 , "phi" : 90 , "type" : "ge"},
+    93 : {"name": "ry219" , "theta": -141.429 , "phi" : 90 , "type" : "ge"},
+    94 : {"name": "ry231" , "theta": -128.571 , "phi" : 90 , "type" : "ge"},
+    95 : {"name": "ry238" , "theta": -122.143 , "phi" : 90 , "type" : "ge"},
+    96 : {"name": "ry244" , "theta": -115.714 , "phi" : 90 , "type" : "ge"},
+    97 : {"name": "ry251" , "theta": -109.286 , "phi" : 90 , "type" : "ge"},
+    98 : {"name": "ry257" , "theta": -102.857 , "phi" : 90 , "type" : "ge"},
+    99 : {"name": "ry264" , "theta":  -96.429 , "phi" : 90 , "type" : "ge"},
+    100: {"name": "ry276" , "theta":  -83.571 , "phi" : 90 , "type" : "ge"},
+    101: {"name": "ry283" , "theta":  -77.143 , "phi" : 90 , "type" : "ge"},
+    102: {"name": "ry289" , "theta":  -70.714 , "phi" : 90 , "type" : "ge"},
+    103: {"name": "ry296" , "theta":  -64.286 , "phi" : 90 , "type" : "ge"},
+    104: {"name": "ry302" , "theta":  -57.857 , "phi" : 90 , "type" : "ge"},
+    105: {"name": "ry309" , "theta":  -51.429 , "phi" : 90 , "type" : "ge"},
+    106: {"name": "ry321" , "theta":  -38.571 , "phi" : 90 , "type" : "ge"},
+    107: {"name": "ry328" , "theta":  -32.143 , "phi" : 90 , "type" : "ge"},
+    108: {"name": "ry334" , "theta":  -25.714 , "phi" : 90 , "type" : "ge"},
+    109: {"name": "ry341" , "theta":  -19.286 , "phi" : 90 , "type" : "ge"},
+    110: {"name": "ry347" , "theta":  -12.857 , "phi" : 90 , "type" : "ge"},
+    111: {"name": "ry354" , "theta":   -6.429 , "phi" : 90 , "type" : "ge"},
+    112: {"name" : "phaseCorrPark" ,    "type" : "phase"},
+    113: {"name" : "phaseCorrNW" ,      "type" : "phase"},
+    114: {"name" : "phaseCorrNE" ,      "type" : "phase"},
+    115: {"name" : "phaseCorrSW" ,      "type" : "phase"},
+    116: {"name" : "phaseCorrSE" ,      "type" : "phase"},
+    117: {"name" : "t" ,                "type" : "phase"},
+    118: {"name" : "s" ,                "type" : "phase"},
+    119: {"name" : "z" ,                "type" : "phase"},
+    120: {"name" : "sdag" ,             "type" : "phase"},
+    121: {"name" : "tdag" ,             "type" : "phase"},
 }
 
 valid_types = {'ge', 'ef', 'spec', 'raw-drag', 'ef-raw', 'square', 'phase'}
-
 
 def mw_lutmap_is_valid(lutmap: dict) -> bool:
     """
@@ -235,6 +196,10 @@ class Base_MW_LutMan(Base_LutMan):
         """Set the default lutmap for standard microwave drive pulses."""
         self.LutMap(default_mw_lutmap.copy())
 
+    def set_inspire_lutmap(self):
+        """Set the default lutmap for expanded microwave drive pulses."""
+        self.LutMap(inspire_mw_lutmap.copy())
+
     def _add_waveform_parameters(self):
         # defined here so that the VSM based LutMan can overwrite this
         self.wf_func = wf.mod_gauss
@@ -284,6 +249,13 @@ class Base_MW_LutMan(Base_LutMan):
             unit='deg',
             parameter_class=ManualParameter,
             initial_value=0
+        )
+        self.add_parameter(
+            'mw_pulse_length',
+            vals=vals.Numbers(min_value=1e-9),
+            unit='s',
+            parameter_class=ManualParameter,
+            initial_value=20e-9
         )
 
         # spec parameters
@@ -368,6 +340,7 @@ class Base_MW_LutMan(Base_LutMan):
                     amp=amp,
                     phase=waveform['phi'],
                     sigma_length=self.mw_gauss_width(),
+                    time_gate = self.mw_pulse_length(),
                     f_modulation=f_modulation,
                     sampling_rate=self.sampling_rate(),
                     motzoi=self.mw_motzoi(),
@@ -380,6 +353,7 @@ class Base_MW_LutMan(Base_LutMan):
                     amp=amp,
                     phase=waveform['phi'],
                     sigma_length=self.mw_gauss_width(),
+                    time_gate = self.mw_pulse_length(),
                     f_modulation=self.mw_ef_modulation(),
                     sampling_rate=self.sampling_rate(),
                     motzoi=0,
@@ -387,7 +361,8 @@ class Base_MW_LutMan(Base_LutMan):
 
             elif waveform['type'] == 'raw-drag':
                 self._wave_dict[idx] = self.wf_func(
-                    **waveform["drag_pars"])
+                    **waveform["drag_pars"],
+                    time_gate = self.mw_pulse_length())
 
             elif waveform['type'] == 'spec':
                 self._wave_dict[idx] = self.spec_func(
@@ -428,7 +403,23 @@ class Base_MW_LutMan(Base_LutMan):
                 else:
                     raise KeyError('Expected parameter "sq_amp" to exist')
             elif waveform['type'] == 'phase':
-                pass
+                #self._wave_dict[idx] = self.spec_func(
+                    #amp=0,
+                    ##length=self.mw_gauss_width()*4,
+                    ## LDC Kludge for Inspire 2022/07/19
+                    #length=20e-9,     
+                    #sampling_rate=self.sampling_rate(),
+                    #delay=0,
+                    #phase=0)
+                self._wave_dict[idx] = self.wf_func(
+                    amp=0,
+                    phase=0,
+                    time_gate = self.mw_pulse_length(),
+                    sigma_length=self.mw_gauss_width(),
+                    f_modulation=f_modulation,
+                    sampling_rate=self.sampling_rate(),
+                    motzoi=self.mw_motzoi(),
+                    delay=self.pulse_delay())
             else:
                 raise ValueError
 
@@ -516,14 +507,16 @@ class Base_MW_LutMan(Base_LutMan):
     # Functions
     # FIXME: the load_* functions provide an undesired backdoor, also see issue #626
     ############################################################################
+
     def load_phase_pulses_to_AWG_lookuptable(self, phases=np.arange(0, 360, 20)):
         """
         Loads rPhi90 pulses onto the AWG lookuptable.
         """
+        startIndex=32  # changed from 9, LDC, 22/10/23
         if len(phases) > 18:
             raise ValueError('max 18 phase values can be provided')
         for i, (phase) in enumerate(phases):
-            self.LutMap()[i+9] = {"name": "rPhi90", "theta": 90, "phi": phase, "type": "ge"}
+            self.LutMap()[startIndex+i] = {"name": "rPhi90", "theta": 90, "phi": phase, "type": "ge"}
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
     # FIXME: function is almost identical to load_phase_pulses_to_AWG_lookuptable, except for phi vs. theta
@@ -535,8 +528,9 @@ class Base_MW_LutMan(Base_LutMan):
         if (len(phases) > 18):
             raise ValueError('max 18 amplitude values can be provided')
         lm = self.LutMap()
+        startIndex=32 # changed from 9, LDC, 2022/10/23
         for i, (phase) in enumerate(phases):
-            lm[i+9] = {"name": "rPhi90",    "theta": phase,
+            lm[startIndex+i] = {"name": "rPhi90",    "theta": phase,
                        "phi": 0, "type": "ge"}
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
@@ -590,8 +584,9 @@ class Base_MW_LutMan(Base_LutMan):
         # 2. Generate a LutMap for the ef-pulses
         # FIXME: hardcoded indices must match OpenQL definitions
         lm = self.LutMap()
+        startIndex=32 # changed from 9, LDC, 2022/10/23
         for i, (amp, mod_freq) in enumerate(zip(amps, mod_freqs)):
-            lm[i+9] = {"name": "", "type": "raw-drag",
+            lm[startIndex+i] = {"name": "", "type": "raw-drag",
                        "drag_pars": {
                            "amp": amp, "f_modulation": mod_freq,
                            "sigma_length": self.mw_gauss_width(),
@@ -767,6 +762,16 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                            initial_value=0.5)
 
     def _add_phase_correction_parameters(self):
+        self.add_parameter(
+            name=f'vcz_virtual_q_ph_corr_park',
+            parameter_class=ManualParameter,
+            unit='deg',
+            vals=vals.Numbers(-360, 360),
+            initial_value=0.0,
+            docstring=f"Virtual phase correction for parking."
+                        "Will be applied as increment to sine generator phases via command table."
+        )
+
         # corrections for phases that the qubit can acquire during one of its CZ gates
         for gate in ['NW','NE','SW','SE']:
             self.add_parameter(
@@ -799,16 +804,16 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         # there are 8 flux-dance steps for the S17 scheme.
         # NOTE: this correction must not be the same as the above one for the case of a spectator
         #       for a single CZ, because in a flux-dance the qubit can be parked because of multiple adjacent CZ gates
-        for step in np.arange(1,9):
-            self.add_parameter(
-                name=f'vcz_virtual_q_ph_corr_park_step_{step}',
-                parameter_class=ManualParameter,
-                unit='deg',
-                vals=vals.Numbers(-360, 360),
-                initial_value=0.0,
-                docstring=f"Virtual phase correction for parking in flux-dance step {step}."
-                            "Will be applied as increment to sine generator phases via command table."
-            )
+        # for step in np.arange(1,9):
+        #     self.add_parameter(
+        #         name=f'vcz_virtual_q_ph_corr_park_step_{step}',
+        #         parameter_class=ManualParameter,
+        #         unit='deg',
+        #         vals=vals.Numbers(-360, 360),
+        #         initial_value=0.0,
+        #         docstring=f"Virtual phase correction for parking in flux-dance step {step}."
+        #                     "Will be applied as increment to sine generator phases via command table."
+        #     )
 
     def _reset_phase_correction_parameters(self):
         for gate in ['NW','NE','SW','SE']:
@@ -927,7 +932,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
 
         self.AWG.get_instr().set(wf_name_I, wf_I)
         self.AWG.get_instr().set(wf_name_Q, wf_Q)
-
+        
     def load_waveforms_onto_AWG_lookuptable(
             self,
             regenerate_waveforms: bool=True,
@@ -1029,6 +1034,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                     amp=amp,
                     phase=waveform['phi'],
                     sigma_length=self.mw_gauss_width(),
+                    time_gate = self.mw_pulse_length(),
                     f_modulation=f_modulation,
                     sampling_rate=self.sampling_rate(),
                     motzoi=self.mw_motzoi(),
@@ -1041,6 +1047,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                     amp=amp,
                     phase=waveform['phi'],
                     sigma_length=self.mw_gauss_width(),
+                    time_gate = self.mw_pulse_length(),
                     f_modulation=self.mw_ef_modulation(),
                     sampling_rate=self.sampling_rate(),
                     motzoi=0,
@@ -1048,7 +1055,8 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
 
             elif waveform['type'] == 'raw-drag':
                 self._wave_dict[idx] = self.wf_func(
-                    **waveform["drag_pars"])
+                    **waveform["drag_pars"],
+                    time_gate = self.mw_pulse_length())
 
             elif waveform['type'] == 'spec':
                 self._wave_dict[idx] = self.spec_func(
@@ -1084,13 +1092,22 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                     raise KeyError('Expected parameter "sq_amp" to exist')
 
             elif waveform['type'] == 'phase':
-                # fill codewords that are used for phase correction instructions
+                #fill codewords that are used for phase correction instructions
                 # with a zero waveform
                 self._wave_dict[idx] = wf.block_pulse(
                     amp=0,
                     sampling_rate=self.sampling_rate(),
-                    length=self.mw_gauss_width()*4,
+                    #length=self.mw_gauss_width()*4,
+                    length=20e-9,
                     )
+                #self._wave_dict[idx] = self.wf_func(
+                #    amp=0,
+                #    phase=0,
+                #    sigma_length=self.mw_gauss_width(),
+                #    f_modulation=f_modulation,
+                #    sampling_rate=self.sampling_rate(),
+                #    motzoi=self.mw_motzoi(),
+                #    delay=self.pulse_delay())
             else:
                 raise ValueError
 
@@ -1107,34 +1124,104 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
     ##########################################################################
 
     def upload_single_qubit_phase_corrections(self):
+        """
+        Upon upgrading LabOne version and the HDAWG firmware, one may get command table version
+        errors. To fix them, it helps to run the following script,
+
+        --------------------------------------------------------------------
+
+        import json
+        import zhinst.ziPython as zi
+
+        dev = "dev8473" # Update with available HDAWG device ID
+        dataserver = "127.0.0.1"  # Update with dataserver IP
+
+        daq = zi.ziDAQServer(host=dataserver, port=8004, api_level=6)
+        interface   = '1GbE'
+        daq.connectDevice(dev, interface)
+
+        schema_node_path = f"/{dev}/awgs/0/commandtable/schema"
+        schema = daq.get(schema_node_path, flat=True)[schema_node_path][0]['vector']
+        print(json.dumps(json.loads(str(schema)), indent = 2))
+
+        --------------------------------------------------------------------
+
+        and from the output, copy the new "$schema" and "version" to the 'commandtable_dict' below.
+
+
+        """
+
+
         commandtable_dict = {
-            "$schema": "http://docs.zhinst.com/hdawg/commandtable/v2/schema",
-            "header": {"version": "0.2"},
+            "$schema": "https://json-schema.org/draft-07/schema#",
+            "title": "AWG Command Table Schema",
+            "description": "Schema for ZI HDAWG AWG Command Table",
+            "version": "1.2.0",
+            "header": {"version": "1.2.0"},
             "table": []
         }
 
         # manual waveform index 1-to-1 mapping
-        for ind in np.arange(0, 60, 1):
+        for ind in np.arange(0, 112, 1):
             commandtable_dict['table'] += [{"index": int(ind),
                                             "waveform": {"index": int(ind)}
                                             }]
 
         # add phase corrections to the end of the codeword space
-        # the first 8 positions are for parking related phase corrections,
+        # the first position is for parking-relatedrelated phase correction,
         # the last 4 are for phase corrections due to gate in corresponding direction
-        phase_corr_inds = np.arange(52,64,1)
-        for step, cw in enumerate(phase_corr_inds[:8]):
-            phase = self.parameters[f"vcz_virtual_q_ph_corr_step_{step+1}"]()
-            commandtable_dict['table'] += [{"index": int(cw),
-                                            "phase0": {"value": float(phase), "increment": True},
-                                            "phase1": {"value": float(phase), "increment": True}
-                                            }]
+        
+        # changed by LDC, 23/01/31
+        # this change also requires changing the arange statements above and below
+        phase_corr_inds = np.arange(112,117,1)
+
+        phase = self.parameters[f"vcz_virtual_q_ph_corr_park"]()
+        commandtable_dict['table'] += [{"index": int(phase_corr_inds[0]),
+                                        "phase0": {"value": float(phase), "increment": True},
+                                        "phase1": {"value": float(phase), "increment": True}
+                                        }]
+
         for i,d in enumerate(['NW','NE','SW','SE']):
             phase = self.parameters[f"vcz_virtual_q_ph_corr_{d}"]()
-            commandtable_dict['table'] += [{"index": int(phase_corr_inds[i+8]),
+            commandtable_dict['table'] += [{"index": int(phase_corr_inds[i+1]),
                                             "phase0": {"value": float(phase), "increment": True},
                                             "phase1": {"value": float(phase), "increment": True}
                                             }]
+
+        # adding virtual gates for some specific Z rotations
+        # LDC, 23/01/31
+        # T gate
+        commandtable_dict['table'] += [{"index": 117,
+                                        "phase0": {"value": float(45), "increment": True},
+                                        "phase1": {"value": float(45), "increment": True}
+                                        }]
+        # S gate
+        commandtable_dict['table'] += [{"index": 118,
+                                        "phase0": {"value": float(90), "increment": True},
+                                        "phase1": {"value": float(90), "increment": True}
+                                        }]
+        # Z gate
+        commandtable_dict['table'] += [{"index": 119,
+                                        "phase0": {"value": float(180), "increment": True},
+                                        "phase1": {"value": float(180), "increment": True}
+                                        }]
+        # Sdag gate
+        commandtable_dict['table'] += [{"index": 120,
+                                        "phase0": {"value": float(270), "increment": True},
+                                        "phase1": {"value": float(270), "increment": True}
+                                        }]
+        # Tdag gate
+        commandtable_dict['table'] += [{"index": 121,
+                                        "phase0": {"value": float(315), "increment": True},
+                                        "phase1": {"value": float(315), "increment": True}
+                                        }]
+
+        # currently there are 6 unused codewords
+        # LDC, 23/01/31
+        for ind in np.arange(122, 128, 1):
+            commandtable_dict['table'] += [{"index": int(ind),
+                                            "waveform": {"index": int(ind)}  
+                                            }]  
 
         # NOTE: Whenever the command table is used, the phase offset between I and Q channels on
         # the HDAWG for real-time modulation has to be initialized from the table itself.
@@ -1153,50 +1240,6 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
     ##########################################################################
     # Private functions
     ##########################################################################
-
-    def _add_phase_correction_parameters(self):
-        # corrections for phases that the qubit can acquire during one of its CZ gates
-        for gate in ['NW','NE','SW','SE']:
-            self.add_parameter(
-                name=f'vcz_virtual_q_ph_corr_{gate}',
-                parameter_class=ManualParameter,
-                unit='deg',
-                vals=vals.Numbers(-360, 360),
-                initial_value=0.0,
-                docstring=f"Virtual phase correction for two-qubit gate in {gate}-direction."
-                            "Will be applied as increment to sine generator phases via command table."
-            )
-
-        # corrections for phases that the qubit can acquire during parking as spectator of a CZ gate.
-        # this can happen in general for each of its neighbouring qubits (below: 'direction'),
-        # while it is doing a gate in each possible direction (below: 'gate')
-        # for direction in ['NW','NE','SW','SE']:
-        #     for gate in ['NW','NE','SW','SE']:
-        #         self.add_parameter(
-        #             name=f'vcz_virtual_q_ph_corr_spec_{direction}_gate_{gate}',
-        #             parameter_class=ManualParameter,
-        #             unit='deg',
-        #             vals=vals.Numbers(0, 360),
-        #             initial_value=0.0,
-        #             docstring=f"Virtual phase correction for parking as spectator of a qubit in direction {direction}, "
-        #                       f"that is doing a gate in direction {gate}."
-        #                         "Will be applied as increment to sine generator phases via command table."
-        #         )
-
-        # corrections for phases that the qubit can acquire during parking as part of a flux-dance step
-        # there are 8 flux-dance steps for the S17 scheme.
-        # NOTE: this correction must not be the same as the above one for the case of a spectator
-        #       for a single CZ, because in a flux-dance the qubit can be parked because of multiple adjacent CZ gates
-        for step in np.arange(1,9):
-            self.add_parameter(
-                name=f'vcz_virtual_q_ph_corr_step_{step}',
-                parameter_class=ManualParameter,
-                unit='deg',
-                vals=vals.Numbers(0, 360),
-                initial_value=0.0,
-                docstring=f"Virtual phase correction for parking in flux-dance step {step}."
-                            "Will be applied as increment to sine generator phases via command table."
-            )
 
     def _set_channel_range(self, val):
         awg_nr = (self.channel_I()-1)//2
@@ -1444,7 +1487,6 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
             wave_dict[key] = GI, GQ, DI, DQ
         return wave_dict
 
-
 class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
     def __init__(self, name, **kw):
         """
@@ -1550,57 +1592,67 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         # FIXME: this creates _wave_dict, independent of LutMap
         self._wave_dict['I'] = self.wf_func(
             amp=0, sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=0,
             motzoi=0, delay=self.pulse_delay())
         self._wave_dict['rX180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=0,
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rY180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90,
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rX90'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=0,
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rY90'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90,
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rXm90'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=0,
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rYm90'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90,
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rPhi180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rPhi90'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rPhim90'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
@@ -1616,6 +1668,7 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
             self._wave_dict['r{}_90'.format(angle)] = self.wf_func(
                 amp=self.mw_amp180()*self.mw_amp90_scale(),
                 sigma_length=self.mw_gauss_width(),
+                time_gate = self.mw_pulse_length(),
                 f_modulation=f_modulation,
                 sampling_rate=self.sampling_rate(), phase=angle,
                 motzoi=self.mw_motzoi(), delay=self.pulse_delay())
@@ -1625,40 +1678,47 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         ########################################
         self._wave_dict['X180c'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rY180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90,
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rY180c'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90+self.phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rX90c'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rY90c'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90+self.phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rXm90c'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rYm90c'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90+self.phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
@@ -1704,7 +1764,6 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
                 'wave_ch{}_cw{:03}'.format(self.channel_I(), cw_idx),
                 'wave_ch{}_cw{:03}'.format(self.channel_Q(), cw_idx))
         self.LutMap(LutMap)
-
 
 # Not the cleanest inheritance but whatever - MAR Nov 2017
 class QWG_VSM_MW_LutMan(AWG8_VSM_MW_LutMan):
