@@ -40,6 +40,7 @@ pygsti==0.9.6  # FIXME: 0.9.7.5 breaks test_gst.py
 pyvisa>=1.8
 plotly<3.8  # FIXME: removing version constraint breaks test_gst.py
 pytest
+qutechopenql==0.12.2
 
 
 # cmake
