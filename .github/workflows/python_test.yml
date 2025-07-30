@@ -11,7 +11,7 @@ jobs:
       max-parallel: 4
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.10']
+        python-version: ['3.8', '3.9']
 
     steps:
     - uses: actions/checkout@v4
@@ -57,7 +57,8 @@ jobs:
         flake8 . --count --exit-zero --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    # - name: Test with pytest
+    # - name: Test with pytest    # Commented out since some tests are 8 years old by now. Sorry guys, not enough time in my hands
+                                  # right now to write new tests for PycQED, Marios Samiotis 30/07/2025
     #   run: |
     #     py.test pycqed/tests --cov=pycqed --cov-report xml --cov-report html --cov-config=.coveragerc
 #    - name: Upload code coverage report
