@@ -48,7 +48,7 @@ pythonnet
 # zhinst==23.2.4
 zhinst==21.8.20515
 graphviz==0.16
-pygraphviz==1.5
+# pygraphviz==1.5
 qcodes==0.42.1
 adaptive==1.1.0
 
