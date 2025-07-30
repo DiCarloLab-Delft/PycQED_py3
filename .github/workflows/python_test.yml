@@ -31,7 +31,7 @@ jobs:
     # Now installs from specific commit. Should be more reliable than trying to fetch latest (unofficial) release.
     - name: Install development release of OpenQL
       run: |
-        pip install cmake
+        pip install cmake==3.27.9
         pip install wheel
         pip install 'qutechopenql @ git+https://github.com/DiCarloLab-Delft/OpenQL@82a9881bdb2c2f2b0620c14c549c436f21d1607c'
 
