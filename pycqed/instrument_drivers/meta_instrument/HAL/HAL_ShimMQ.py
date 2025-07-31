@@ -160,6 +160,26 @@ class HAL_ShimMQ(Instrument):
                         #         ch_not_ready += AWG.geti("sigouts/{}/busy".format(i))
                         #     check_keyboard_interrupt()
 
+            if "flux" in lat_key:
+                # Check name to prevent crash when instrument not specified
+                AWG_name = self.get("instr_AWG_{}".format(lat_key))
+
+                if AWG_name is not None:
+                    AWG = self.find_instrument(AWG_name)
+                    using_QWG = AWG.__class__.__name__ == "QuTech_AWG_Module"
+                    if not using_QWG:
+                        AWG.stop()
+                        for qubit in self.qubits():
+                            q_obj = self.find_instrument(qubit)
+                            FLUX_lm = self.find_instrument(q_obj.instr_LutMan_Flux())
+                            if AWG_name == FLUX_lm.AWG():
+                                extra_delay = q_obj.flux_fine_delay()
+                                awg_channel     = FLUX_lm.cfg_awg_channel()
+                                log.debug("Setting `sigouts_{}_delay` to {:4g}"
+                                          " in {}".format(awg_channel, lat_fine, AWG.name))
+                                AWG.set("sigouts_{}_delay".format(awg_channel - 1), lat_fine + extra_delay)
+                        AWG.start()
+
     def prepare_fluxing(self, qubits):
         for qb_name in qubits:
             qb = self.find_instrument(qb_name)
