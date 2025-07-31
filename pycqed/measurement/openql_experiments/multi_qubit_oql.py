@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 import numpy as np
 
 from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
@@ -587,6 +587,7 @@ def FluxTimingCalibration(
 
 def Cryoscope(
         qubit_idxs: list,
+        parked_qubits_id: Optional[list] = None,
         flux_cw: str = 'fl_cw_06',  # FIXME: effectively unused
         twoq_pair=[2, 0],
         platf_cfg: str = '',
@@ -605,6 +606,8 @@ def Cryoscope(
     Returns:
         p:              OpenQL Program object containing
     """
+    if not parked_qubits_id:
+        parked_qubits_id = []
 
     p = OqlProgram("Cryoscope", platf_cfg)
 
@@ -615,7 +618,7 @@ def Cryoscope(
         k.gate('rx90', [q_idx])
     k.gate('wait', [], wait_time_flux)
     k.barrier([])  # alignment workaround
-    for q_idx in qubit_idxs:
+    for q_idx in qubit_idxs + parked_qubits_id:
         k.gate('sf_square', [q_idx])
     k.barrier([])  # alignment workaround
     k.gate('wait', [], wait_time_flux)
@@ -633,7 +636,7 @@ def Cryoscope(
         k.gate('rx90', [q_idx])
     k.gate('wait', [], wait_time_flux)
     k.barrier([])  # alignment workaround
-    for q_idx in qubit_idxs:
+    for q_idx in qubit_idxs + parked_qubits_id:
         k.gate('sf_square', [q_idx])
     k.barrier([])  # alignment workaround
     k.gate('wait', [], wait_time_flux)
@@ -652,7 +655,7 @@ def Cryoscope(
             k.gate('rx90', [q_idx])
         k.gate('wait', [], wait_time_flux)
         k.barrier([])  # alignment workaround
-        for q_idx in qubit_idxs:
+        for q_idx in qubit_idxs + parked_qubits_id:
             k.gate('sf_square', [q_idx])
         k.barrier([])  # alignment workaround
         k.gate('wait', [], wait_time_flux)
@@ -670,7 +673,7 @@ def Cryoscope(
             k.gate('rx90', [q_idx])
         k.gate('wait', [], wait_time_flux)
         k.barrier([])  # alignment workaround
-        for q_idx in qubit_idxs:
+        for q_idx in qubit_idxs + parked_qubits_id:
             k.gate('sf_square', [q_idx])
         k.barrier([])  # alignment workaround
         k.gate('wait', [], wait_time_flux)
@@ -910,6 +913,7 @@ def Chevron(
                 k.gate('sf_square', [q_park])  # square pulse
         # k.gate('sf_{}'.format(flux_cw_name), [qubit_idx])
         k.gate('sf_square', [qubit_idx])
+        k.gate('sf_square', [qubit_idx_spec]) # Added by RDC 21/07/2025
         k.barrier([])  # alignment workaround
     else:
         raise ValueError('CC type not understood: {}'.format(cc))

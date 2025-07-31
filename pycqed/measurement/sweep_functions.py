@@ -965,7 +965,7 @@ class FLsweep(Soft_Sweep):
             old_val_amp = self.lm.cfg_awg_channel_amplitude()
             self.lm.cfg_awg_channel_amplitude(self.amp_for_generation)
         self.AWG.stop()
-        self.lm.load_waveform_onto_AWG_lookuptable(self.waveform_name, regenerate_waveforms=True)
+        self.lm.load_waveform_onto_AWG_lookuptable(self.waveform_name, regenerate_waveforms=True) 
         if self.amp_for_generation:
             self.lm.cfg_awg_channel_amplitude(abs(old_val_amp))
 

@@ -554,10 +554,10 @@ import os
 import pycqed as pq
 from pycqed.measurement.openql_experiments import generate_CC_cfg as gc
 input_file = os.path.join(pq.__path__[0], 'measurement',
-                          'openql_experiments', 'config_cc_s5_direct_iq.json.in')
+                          'openql_experiments', 'config_cc_s7_direct_iq.json.in')
 config_fn = os.path.join(pq.__path__[0], 'measurement',
-                         'openql_experiments', 'output_cc_s5_direct_iq',
-                         'cc_s5_direct_iq.json')
+                         'openql_experiments', 'output_cc_s7_direct_iq',
+                         'cc_s7_direct_iq.json')
 
 class Two_qubit_gate_calibration(AutoDepGraph_DAG):
 	def __init__(self, 

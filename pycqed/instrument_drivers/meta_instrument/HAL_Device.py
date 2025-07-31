@@ -411,6 +411,10 @@ class HAL_Device(HAL_ShimMQ):
         MC.set_sweep_points(p.sweep_points)
         d = self.get_int_avg_det()
         MC.set_detector_function(d)
+        
+        # Check low frequency qubit CZ amplitude
+        print("Amplituce SE", self.find_instrument("flux_lm_SE").vcz_amp_dac_at_11_02_NE())
+        
         MC.run(
             "conditional_oscillation_{}_x{}_{}{}".format(
                 list_qubits_used, cz_repetitions,
@@ -2129,7 +2133,7 @@ class HAL_Device(HAL_ShimMQ):
 
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
         fl_lutman_spec = self.find_instrument(q_spec).instr_LutMan_Flux.get_instr()
-
+        
         if waveform_name == "square":
             length_par = fl_lutman.sq_length
             flux_cw = 6
@@ -2138,7 +2142,7 @@ class HAL_Device(HAL_ShimMQ):
             flux_cw = fl_lutman._get_cw_from_wf_name(waveform_name)
         else:
             raise ValueError("Waveform shape not understood")
-
+        
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=[q0, q_spec])
 
@@ -2575,6 +2579,7 @@ class HAL_Device(HAL_ShimMQ):
         self,
         qubits,
         times,
+        park_qubits: List[str] = [],
         MC=None,
         nested_MC=None,
         double_projections: bool = False,
@@ -2651,6 +2656,7 @@ class HAL_Device(HAL_ShimMQ):
 
         p = mqo.Cryoscope(
             qubit_idxs=Q_idxs,
+            parked_qubits_id=[self.find_instrument(q).cfg_qubit_nr() for q in park_qubits],
             flux_cw=flux_cw,
             twoq_pair=twoq_pair,
             wait_time_flux=wait_time_flux,
@@ -6453,7 +6459,9 @@ class HAL_Device(HAL_ShimMQ):
         flux_codeword: str = 'cz',
         flux_pulse_duration: float = 60e-9,
         prepare_for_timedomain: bool = True,
-        disable_metadata: bool = False):
+        disable_metadata: bool = False,
+        TLS: bool = False # added by RDC 21-07-2025
+        ):
         """
         Perform 2D sweep of amplitude and wave parameter while measuring 
         conditional phase and missing fraction via the "conditional 
@@ -6491,9 +6499,11 @@ class HAL_Device(HAL_ShimMQ):
                 lm.set(f'vcz_amp_sq_{directions[i][0]}', 1)
                 lm.set(f'vcz_amp_fine_{directions[i][0]}', .5)
                 lm.set(f'vcz_amp_dac_at_11_02_{directions[i][0]}', .5)
-            for i, lm in enumerate(Flux_lm_1):
-                print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
-                lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
+            if not TLS: # added by RDC 21-07-2025
+                for i, lm in enumerate(Flux_lm_1):
+                    print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
+                    lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
+                
         # Look for Tp values
         if Tp:
             if isinstance(Tp, str):
@@ -6698,7 +6708,8 @@ class HAL_Device(HAL_ShimMQ):
         cz_repetitions = 1,
         ro_acq_averages = 2**9,
         prepare_for_timedomain: bool = True,
-        disable_metadata: bool = False):
+        disable_metadata: bool = False,
+        TLS: bool = False): # added by RDC on 21-07-2025
         """
         Perform 2D sweep of amplitude and wave parameter while measuring 
         conditional phase and missing fraction via the "conditional 
@@ -6736,9 +6747,12 @@ class HAL_Device(HAL_ShimMQ):
                 print(f'Setting {Q0[i]} vcz_amp_dac_at_11_02_{directions[i][0]} to 0.5')
                 lm.set(f'vcz_amp_sq_{directions[i][0]}', 1)
                 lm.set(f'vcz_amp_dac_at_11_02_{directions[i][0]}', .5)
-            for i, lm in enumerate(Flux_lm_1):
-                print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
-                lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
+            if not TLS: # added by RDC on 21-07-2025
+                for i, lm in enumerate(Flux_lm_1):
+                    print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
+                    lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
+            # print('Flux hi')
+            # print(Flux_lm_1[0].vcz_amp_dac_at_11_02_NE())
         # Update two qubit gate parameters
         if update_flux_params:
             # List of current flux lutman amplitudes
