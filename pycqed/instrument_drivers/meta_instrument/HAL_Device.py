@@ -411,10 +411,6 @@ class HAL_Device(HAL_ShimMQ):
         MC.set_sweep_points(p.sweep_points)
         d = self.get_int_avg_det()
         MC.set_detector_function(d)
-        
-        # Check low frequency qubit CZ amplitude
-        print("Amplituce SE", self.find_instrument("flux_lm_SE").vcz_amp_dac_at_11_02_NE())
-        
         MC.run(
             "conditional_oscillation_{}_x{}_{}{}".format(
                 list_qubits_used, cz_repetitions,
