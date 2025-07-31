@@ -20,7 +20,7 @@ The central repository holds three types of branches:
 We consider _origin/master_ to be the main branch where the source code of HEAD always reflects a production-ready state.
 
 * safe to merge into project branches
-* staring point for supporting branches
+* starting point for supporting branches
 * contains only reviewed code
 
 #### The project branch

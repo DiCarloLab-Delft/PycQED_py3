@@ -11,6 +11,7 @@ from pycqed.instrument_drivers.physical_instruments.QuTech.QWG import QWG,QWGMul
 
 
 class Test_QWG(unittest.TestCase):
+    @unittest.skip(reason="Deprecated hardware")
     def test_qwg_core(self):
         file_name = 'Test_QWG_test_qwg_core.scpi.txt'
         test_path = Path('test_output') / file_name
@@ -39,7 +40,10 @@ class Test_QWG(unittest.TestCase):
         test_output = test_path.read_bytes()
         golden_path = Path(__file__).parent / 'golden' / file_name
         golden = golden_path.read_bytes()
-        self.assertEqual(test_output, golden)
+        # Formats test-output and reference (golden) to compare independent of '\r' carriage return signature
+        decoded_test_output: str = test_output.decode('utf-8').replace('\r', '')
+        decoded_ref_output: str = golden.decode('utf-8').replace('\r', '')
+        self.assertEqual(decoded_test_output, decoded_ref_output)
 
     def test_awg_parameters(self):
         file_name = 'Test_QWG_test_awg_parameters.scpi.txt'

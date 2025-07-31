@@ -20,7 +20,7 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
             name:
             address: used to connect to the SPI rack e.g., "COM10"
             channel map: {"parameter_name": (module_nr, dac_nr)}
-            reset_currents: if True, ramps all currents to zero upon 
+            reset_currents: if True, ramps all currents to zero upon
                 connecting.
 
         For an example of how to use this instrument see
@@ -53,7 +53,10 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
         for mod_id in module_ids:
             # N.B. reset currents has a slow ramp build in.
             self.current_sources[mod_id] = S4g_module(
-                self.spi_rack, module=mod_id, reset_currents=reset_currents)
+                self.spi_rack,
+                module=mod_id,
+                max_current=50e-3,
+                reset_currents=reset_currents)
 
         for parname, (mod_id, dac) in self.channel_map.items():
             self.add_parameter(
@@ -61,7 +64,7 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
                 get_cmd=partial(self._get_current, parname),
                 set_cmd=partial(self._set_current, parname),
                 unit="A",
-                vals=validators.Numbers(min_value=-50e-3, max_value=50e-3))
+                vals=validators.Numbers(min_value=-25e-3, max_value=25e-3))
 
         self.connect_message(begin_time=t0)
 

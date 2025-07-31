@@ -11,6 +11,8 @@ import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 from pycqed.utilities.general import format_value_string
 from copy import deepcopy
+from pycqed.analysis.tools.plotting import SI_val_to_msg_str
+from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
 
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
@@ -395,9 +397,13 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
 
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
+
+
+        # Sinusoidal fit
+        # --------------
         # Even though we expect an exponentially damped oscillation we use
         # a simple cosine as this gives more reliable fitting and we are only
-        # interested in extracting the frequency of the oscillation
+        # interested in extracting the oscillation frequency.
         cos_mod = lmfit.Model(fit_mods.CosFunc)
 
         guess_pars = fit_mods.Cos_guess(
@@ -406,13 +412,20 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             data=self.proc_data_dict["corr_data"][:-4],
         )
 
-        # This enforces the oscillation to start at the equator
-        # and ensures that any over/under rotation is absorbed in the
-        # frequency
-        guess_pars["amplitude"].value = 0.5
+        # constrain the amplitude to positive and close to 0.5 
+        guess_pars["amplitude"].value = 0.45
         guess_pars["amplitude"].vary = True
+        guess_pars["amplitude"].min = 0.4
+        guess_pars["amplitude"].max = 0.5
+
+        # force the offset to 0.5
         guess_pars["offset"].value = 0.5
-        guess_pars["offset"].vary = True
+        guess_pars["offset"].vary = False   
+        
+
+        guess_pars["phase"].vary = True
+ 
+        guess_pars["frequency"].vary = True
 
         self.fit_dicts["cos_fit"] = {
             "fit_fn": fit_mods.CosFunc,
@@ -421,20 +434,23 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             "guess_pars": guess_pars,
         }
 
-        # In the case there are very few periods we fall back on a small
-        # angle approximation to extract the drive detuning
+        # Linear fit
+        #-----------
+        # In the case that the amplitude is close to perfect, we will not see a full period of oscillation. 
+        # We resort to a linear fit to extract the oscillation frequency from the slop of the best fit 
         poly_mod = lmfit.models.PolynomialModel(degree=1)
-        # the detuning can be estimated using on a small angle approximation
-        # c1 = d/dN (cos(2*pi*f N) ) evaluated at N = 0 -> c1 = -2*pi*f
+        # for historical reasons, the slope 'c1' is here converted to a frequency.
         poly_mod.set_param_hint("frequency", expr="-c1/(2*pi)")
         guess_pars = poly_mod.guess(
             x=self.raw_data_dict["sweep_points"][:-4],
             data=self.proc_data_dict["corr_data"][:-4],
         )
-        # Constraining the line ensures that it will only give a good fit
-        # if the small angle approximation holds
-        guess_pars["c0"].vary = True
+        # Constrain the offset close to nominal 0.5
         guess_pars["c0"].value = 0.5
+        guess_pars["c0"].vary = True
+        guess_pars["c0"].min = 0.45
+        guess_pars["c0"].max = 0.55
+        
 
         self.fit_dicts["line_fit"] = {
             "model": poly_mod,
@@ -448,13 +464,14 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         sf_cos = self._get_scale_factor_cos()
         self.proc_data_dict["scale_factor"] = self.get_scale_factor()
 
-        msg = "Scale fact. based on "
+        msg = "Best fit:  "
         if self.proc_data_dict["scale_factor"] == sf_cos:
-            msg += "cos fit\n"
+            msg += "cos.\n"
         else:
-            msg += "line fit\n"
-        msg += "cos fit: {:.4f}\n".format(sf_cos)
-        msg += "line fit: {:.4f}".format(sf_line)
+            msg += "line.\n"
+        msg += "line scale fac: {:.4f}\n".format(sf_line)
+        msg += "cos scale fac: {:.4f}".format(sf_cos)
+        
 
         self.raw_data_dict["scale_factor_msg"] = msg
         # TODO: save scale factor to file
@@ -476,28 +493,28 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         return scale_factor
 
     def _get_scale_factor_cos(self):
-        # 1/period of the oscillation corresponds to the (fractional)
-        # over/under rotation error per gate
+        
+        # extract the frequency 
         frequency = self.fit_dicts["cos_fit"]["fit_res"].params["frequency"]
+        
+        # extract phase modulo 2pi
+        phase = np.mod(self.fit_dicts["cos_fit"]["fit_res"].params["phase"],2*np.pi)
+        
+        # resolve ambiguity in the fit, making sign of frequency meaningful.
+        frequency*=np.sign(phase-np.pi)
 
-        # the square is needed to account for the difference between
-        # power and amplitude
-        scale_factor = (1 + frequency) ** 2
-
-        phase = np.rad2deg(self.fit_dicts["cos_fit"]["fit_res"].params["phase"]) % 360
-        # phase ~90 indicates an under rotation so the scale factor
-        # has to be larger than 1. A phase ~270 indicates an over
-        # rotation so then the scale factor has to be smaller than one.
-        if phase > 180:
-            scale_factor = 1 / scale_factor
+        # calculate the scale factor
+        scale_factor = 1 / (1 + 2*frequency)
 
         return scale_factor
 
     def _get_scale_factor_line(self):
-        # 2/period (ref is 180 deg) of the oscillation corresponds
-        # to the (fractional) over/under rotation error per gate
+
+        # extract the slope
         frequency = self.fit_dicts["line_fit"]["fit_res"].params["frequency"]
-        scale_factor = (1 + 2 * frequency) ** 2
+        
+
+        scale_factor = 1 / (1 - 4 * frequency)
         # no phase sign check is needed here as this is contained in the
         # sign of the coefficient
 
@@ -507,10 +524,12 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         self.plot_dicts["main"] = {
             "plotfn": self.plot_line,
             "xvals": self.raw_data_dict["sweep_points"],
-            "xlabel": self.raw_data_dict["xlabel"],
-            "xunit": self.raw_data_dict["xunit"],  # does not do anything yet
+            #"xlabel": self.raw_data_dict["xlabel"],
+            "xlabel": r"Number of (effective) $\pi$ pulses",
+            #"xunit": self.raw_data_dict["xunit"],  # does not do anything yet
+            "yunit": "",
             "yvals": self.proc_data_dict["corr_data"],
-            "ylabel": "Excited state population",
+            "ylabel": "Excited-state population",
             "yunit": "",
             "setlabel": "data",
             "title": (
@@ -519,7 +538,7 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
                 + self.raw_data_dict["measurementstring"]
             ),
             "do_legend": True,
-            "legend_pos": "upper right",
+            "legend_pos": "upper left",
         }
 
         if self.do_fitting:
@@ -530,7 +549,7 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
                 "plot_init": self.options_dict["plot_init"],
                 "setlabel": "line fit",
                 "do_legend": True,
-                "legend_pos": "upper right",
+                "legend_pos": "upper left",
             }
 
             self.plot_dicts["cos_fit"] = {
@@ -540,12 +559,13 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
                 "plot_init": self.options_dict["plot_init"],
                 "setlabel": "cos fit",
                 "do_legend": True,
-                "legend_pos": "upper right",
+                "legend_pos": "upper left",
             }
 
             self.plot_dicts["text_msg"] = {
                 "ax_id": "main",
                 "ypos": 0.15,
+                "xpos": 0.3,
                 "plotfn": self.plot_text,
                 "box_props": "fancy",
                 "text_string": self.raw_data_dict["scale_factor_msg"],
@@ -618,7 +638,7 @@ class EFRabiAnalysis(Single_Qubit_TimeDomainAnalysis):
 
         msg = r'$\pi$-ef amp '
         msg += ': {:.4f}\n'.format(sf_cos)
-        
+
 
         self.raw_data_dict['scale_factor_msg'] = msg
         # TODO: save scale factor to file
@@ -746,7 +766,7 @@ class DecoherenceAnalysis(Single_Qubit_TimeDomainAnalysis):
 
         msg = r'$\pi$-ef amp '
         msg += ': {:.4f}\n'.format(sf_cos)
-        
+
 
         self.raw_data_dict['scale_factor_msg'] = msg
         # TODO: save scale factor to file
@@ -803,7 +823,7 @@ class DecoherenceAnalysis(Single_Qubit_TimeDomainAnalysis):
 
         if self.do_fitting:
             # Initialize parameters for pure decay curves (so freq = 0)
-            # Get values of fit and get rid of frequency 
+            # Get values of fit and get rid of frequency
 
             # First make deepcopy of results
             pars_decay = deepcopy(self.fit_dicts['ExpGaussDecayCos']['fit_res'].params)
@@ -866,7 +886,7 @@ class DecoherenceAnalysis(Single_Qubit_TimeDomainAnalysis):
                 'plotfn': self.plot_text,
                 'box_props': 'fancy',
                 'horizontalalignment': 'left',
-                'text_string': 'The fit function is defined as' + '\n' + 
+                'text_string': 'The fit function is defined as' + '\n' +
                  '$A e^{-t\Gamma_{exp} - (t \Gamma_{\phi})^2}\cos(2 \pi f t) + Off$'}
 
 
@@ -951,10 +971,10 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
         self.proc_data_dict['data0_I_Q'] = np.mean(self.proc_data_dict['data_I_Q'][-4:-2])
         self.proc_data_dict['data0_Q_Q'] = np.mean(self.proc_data_dict['data_Q_Q'][-4:-2])
 
-        self.proc_data_dict['data_A_I'] = np.sqrt((self.proc_data_dict['data_I_I']-self.proc_data_dict['data0_I_I'])**2 + 
+        self.proc_data_dict['data_A_I'] = np.sqrt((self.proc_data_dict['data_I_I']-self.proc_data_dict['data0_I_I'])**2 +
                                               (self.proc_data_dict['data_Q_I']-self.proc_data_dict['data0_Q_I'])**2)
-        self.proc_data_dict['data_A_Q'] = np.sqrt((self.proc_data_dict['data_I_Q']-self.proc_data_dict['data0_I_Q'])**2 + 
-                                              (self.proc_data_dict['data_Q_Q']-self.proc_data_dict['data0_Q_Q'])**2)        
+        self.proc_data_dict['data_A_Q'] = np.sqrt((self.proc_data_dict['data_I_Q']-self.proc_data_dict['data0_I_Q'])**2 +
+                                              (self.proc_data_dict['data_Q_Q']-self.proc_data_dict['data0_Q_Q'])**2)
         self.proc_data_dict['data0_A_I'] = np.mean(self.proc_data_dict['data_A_I'][-4:-2])
         self.proc_data_dict['data1_A_I'] = np.mean(self.proc_data_dict['data_A_I'][-2:])
         self.proc_data_dict['dataA_I_avg'] = np.mean([self.proc_data_dict['data0_A_I'],
@@ -972,7 +992,7 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
         self.proc_data_dict['plot_data_A_Q'] = (self.proc_data_dict['data_A_Q'] - self.proc_data_dict['dataA_Q_avg'])/\
                                             self.proc_data_dict['dataA_Q_amp']*2
 
-        
+
         self.proc_data_dict['phase'] = np.unwrap(np.arctan2(self.proc_data_dict['plot_data_A_Q'][:-4],self.proc_data_dict['plot_data_A_I'][:-4]))
         self.proc_data_dict['amp'] = np.hstack([np.sqrt(self.proc_data_dict['plot_data_A_Q'][:-4]**2+self.proc_data_dict['plot_data_A_I'][:-4]**2),
                  np.abs(self.proc_data_dict['plot_data_A_Q'][-4:])])
@@ -980,7 +1000,7 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
 
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
-        
+
 
         phase_guess_fit = np.polyfit(self.proc_data_dict['plot_times_I'][:-4],
                                      self.proc_data_dict['phase'],1,
@@ -991,9 +1011,9 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
         # if max(self.proc_data_dict['amp'][:-4]) > 1.5:
         freq_guess1 = np.fft.fft(1j*self.proc_data_dict['plot_data_A_Q'][:-4] + self.proc_data_dict['plot_data_A_I'][:-4])
         freqaxis = np.fft.fftfreq(len(freq_guess1),self.proc_data_dict['plot_times_I'][1] - self.proc_data_dict['plot_times_I'][0])
-        freqaxis1 = freqaxis[1:] 
+        freqaxis1 = freqaxis[1:]
         freq_guess = freqaxis1[np.argmax(np.abs(freq_guess1[1:]))]*2*np.pi
-        # import matplotlib.pyplot as plt 
+        # import matplotlib.pyplot as plt
         # plt.plot(freqaxis[1:],np.abs(freq_guess1[1:]))
         # plt.plot(freq_guess,np.max(np.abs(freq_guess1[1:])),'x',markersize=8)
 
@@ -1114,7 +1134,7 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
             'dpi': 200,
             'do_legend': True,
             'legend_pos': 'best'}
-        
+
         if self.do_fitting:
 
             self.plot_dicts['exp_fit_real'] = {
@@ -1200,7 +1220,46 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
 
 
 
+            self.plot_dicts['exp_fit_parametric'] = {
+                'ax_id': 'Parametric',
+                'plotfn': self.plot_fit,
+                'output_mod_fn':np.imag,
+                'output_mod_fn_x':np.real,
+                'fit_res': self.fit_dicts['exp_fit']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'exp fit parametric',
+                'do_legend': True,
+                'legend_pos': 'best'}
 
+            fit_res_params = self.fit_dicts['exp_fit']['fit_res'].params
+            scale_frequency, unit_frequency = SI_prefix_and_scale_factor(fit_res_params['frequency'].value,'Hz')
+            plot_frequency = fit_res_params['frequency'].value*scale_frequency
+            scale_amplitude, unit_amplitude = SI_prefix_and_scale_factor(fit_res_params['amplitude'].value)
+            plot_amplitude = fit_res_params['amplitude'].value*scale_amplitude
+            scale_tau, unit_tau = SI_prefix_and_scale_factor(fit_res_params['tau'].value,'s')
+            plot_tau = fit_res_params['tau'].value*scale_tau
+            scale_offset_I, unit_offset_I = SI_prefix_and_scale_factor(fit_res_params['offset_I'].value)
+            plot_offset_I = fit_res_params['offset_I'].value*scale_offset_I
+            scale_offset_Q, unit_offset_Q = SI_prefix_and_scale_factor(fit_res_params['offset_Q'].value)
+            plot_offset_Q = fit_res_params['offset_Q'].value*scale_offset_Q
+            # scale_phase, label_phase = SI_prefix_and_scale_factor(fit_res_params['phase'].value, 'rad')
+            # print(SI_prefix_and_scale_factor(fit_res_params['frequency'].value,'Hz'))
+            self.plot_dicts['Parameters'] = {
+                'ax_id': 'main',
+                'ypos': .5,
+                'xpos': 1.04,
+                'plotfn': self.plot_text,
+                'dpi': 200,
+                'box_props': 'fancy',
+                'horizontalalignment': 'left',
+                # 'text_string': 'Chi = ' + str(self.fit_dicts['ExpGaussDecayCos']['fit_res'].chisqr),
+                'text_string': 'Fit results' + '\n'
+                                + '$\mathrm{\chi}^2$ = %.3f'%(self.fit_dicts['exp_fit']['fit_res'].chisqr)  + '\n'
+                                + 'Detuning = %.2f '%(plot_frequency) + unit_frequency + '\n'
+                                + '$\mathrm{T}_2$ = %.2f '%(plot_tau) + unit_tau + '\n'
+                                + 'A = %.2f '%(plot_amplitude) + unit_amplitude + '\n'
+                                + 'Offset I = %.2f ' %(plot_offset_I) + unit_offset_I + '\n'
+                                + 'Offset Q = %.2f ' %(plot_offset_Q) + unit_offset_Q + '\n'}
 
 
 
@@ -1816,7 +1875,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "yvals": self.proc_data_dict["yvals_osc_off"],
             "ylabel": y_label,
             "yunit": self.proc_data_dict["yunit"],
-            "setlabel": "CZ off",
+            "setlabel": "Control 0",
             "title": (
                 self.raw_data_dict["timestamps"][0]
                 + " \n"
@@ -1824,7 +1883,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             ),
             "do_legend": True,
             # 'yrange': (0,1),
-            "legend_pos": "upper right",
+            "legend_pos": "lower left",
         }
 
         self.plot_dicts[ax_id + "_on"] = {
@@ -1836,9 +1895,9 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "yvals": self.proc_data_dict["yvals_osc_on"],
             "ylabel": y_label,
             "yunit": self.proc_data_dict["yunit"],
-            "setlabel": "CZ on",
+            "setlabel": "Control 1",
             "do_legend": True,
-            "legend_pos": "upper right",
+            "legend_pos": "lower left",
         }
 
         self.plot_dicts[ax_id + "_cal_pnts"] = {
@@ -1846,9 +1905,11 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "ax_id": ax_id,
             "xvals": self.proc_data_dict["xvals_cal"],
             "yvals": self.proc_data_dict["yvals_osc_cal"],
-            "setlabel": "Calib.",
+            "setlabel": "RO Cal",
             "do_legend": True,
+            "legend_pos": "lower left",
             "marker": "d",
+
         }
 
         if self.do_fitting:
@@ -1857,16 +1918,18 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 "plotfn": self.plot_fit,
                 "fit_res": self.fit_dicts["cos_fit_off"]["fit_res"],
                 "plot_init": self.options_dict["plot_init"],
-                "setlabel": "Fit CZ off",
+                "setlabel": "Fit Ctrl. 0",
                 "do_legend": True,
+                "legend_pos": "lower left",
             }
             self.plot_dicts[ax_id + "_cos_fit_on"] = {
                 "ax_id": ax_id,
                 "plotfn": self.plot_fit,
                 "fit_res": self.fit_dicts["cos_fit_on"]["fit_res"],
                 "plot_init": self.options_dict["plot_init"],
-                "setlabel": "Fit CZ on",
+                "setlabel": "Fit Ctrl. 1",
                 "do_legend": True,
+                "legend_pos": "lower left",
             }
 
             # offset as a guide for the eye
@@ -1890,13 +1953,13 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             qoi = self.proc_data_dict["quantities_of_interest"]
             phase_message = (
                 "Phase diff.: {}  deg\n"
-                "Phase off: {} deg\n"
-                "Phase on: {} deg\n\n"
+                "Phase 0: {} deg\n"
+                "Phase 1: {} deg\n\n"
                 "Offs. diff.: {} %\n"
-                "Osc. offs. off: {} \n"
-                "Osc. offs. on: {}\n\n"
-                "Osc. amp. off: {} \n"
-                "Osc. amp. on: {} ".format(
+                "Osc. offs. 0: {} \n"
+                "Osc. offs. 1: {}\n\n"
+                "Osc. amp. 0: {} \n"
+                "Osc. amp. 1: {} ".format(
                     qoi["phi_cond"],
                     qoi["phi_0"],
                     qoi["phi_1"],
@@ -1910,8 +1973,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
 
             self.plot_dicts[ax_id + "_phase_message"] = {
                 "ax_id": ax_id,
-                "ypos": 0.9,
-                "xpos": 1.45,
+                "ypos": 0.5,
+                "xpos": 1.4,
                 "plotfn": self.plot_text,
                 "box_props": "fancy",
                 "line_kws": {"alpha": 0},
@@ -1938,7 +2001,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "yvals": self.proc_data_dict["yvals_spec_off"],
             "ylabel": y_label,
             "yunit": self.proc_data_dict["yunit"],
-            "setlabel": "CZ off",
+            "setlabel": "Ctrl 0",
             "title": (
                 self.raw_data_dict["timestamps"][0]
                 + " \n"
@@ -1957,7 +2020,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "yvals": self.proc_data_dict["yvals_spec_on"],
             "ylabel": y_label,
             "yunit": self.proc_data_dict["yunit"],
-            "setlabel": "CZ on",
+            "setlabel": "Ctrl 1",
             "do_legend": True,
             "legend_pos": "upper right",
         }
@@ -1967,7 +2030,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "ax_id": ax_id,
             "xvals": self.proc_data_dict["xvals_cal"],
             "yvals": self.proc_data_dict["yvals_spec_cal"],
-            "setlabel": "Calib.",
+            "setlabel": "RO Cal",
             "do_legend": True,
             "marker": "d",
         }
@@ -1978,8 +2041,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             )
             self.plot_dicts[ax_id + "_leak_msg"] = {
                 "ax_id": ax_id,
-                "ypos": 0.9,
-                "xpos": 1.45,
+                "ypos": 0.5,
+                "xpos": 1.4,
                 "plotfn": self.plot_text,
                 "box_props": "fancy",
                 "line_kws": {"alpha": 0},
@@ -2006,7 +2069,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "yvals": self.proc_data_dict["yvals_park_off"],
             "ylabel": y_label,
             "yunit": self.proc_data_dict["yunit"],
-            "setlabel": "CZ off",
+            "setlabel": "Ctrl 0",
             "title": (
                 self.raw_data_dict["timestamps"][0]
                 + " \n"
@@ -2025,7 +2088,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "yvals": self.proc_data_dict["yvals_park_on"],
             "ylabel": y_label,
             "yunit": self.proc_data_dict["yunit"],
-            "setlabel": "CZ on",
+            "setlabel": "Ctrl 1",
             "do_legend": True,
             "legend_pos": "upper right",
         }
@@ -2035,7 +2098,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "ax_id": ax_id,
             "xvals": self.proc_data_dict["xvals_cal"],
             "yvals": self.proc_data_dict["yvals_park_cal"],
-            "setlabel": "Calib.",
+            "setlabel": "RO Cal",
             "do_legend": True,
             "marker": "d",
         }
@@ -2046,7 +2109,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 "plotfn": self.plot_fit,
                 "fit_res": self.fit_dicts["park_fit_off"]["fit_res"],
                 "plot_init": self.options_dict["plot_init"],
-                "setlabel": "Fit CZ off",
+                "setlabel": "Fit Ctrl 0",
                 "do_legend": True,
             }
             self.plot_dicts[ax_id + "_park_fit_on"] = {
@@ -2054,7 +2117,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 "plotfn": self.plot_fit,
                 "fit_res": self.fit_dicts["park_fit_on"]["fit_res"],
                 "plot_init": self.options_dict["plot_init"],
-                "setlabel": "Fit CZ on",
+                "setlabel": "Fit Ctrl 1",
                 "do_legend": True,
             }
 

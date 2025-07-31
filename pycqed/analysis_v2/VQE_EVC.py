@@ -1,17 +1,12 @@
-import time
+# import time
 import numpy as np
-from pycqed.analysis import analysis_toolbox as a_tools
-import pycqed.analysis_v2.base_analysis as ba
+# from pycqed.analysis import analysis_toolbox as a_tools
+# import pycqed.analysis_v2.base_analysis as ba
 # import dataprep for tomography module
 # import tomography module
 # using the data prep module of analysis V2
 # from pycqed.analysis_v2 import tomography_dataprep as dataprep
 from pycqed.analysis import measurement_analysis as ma
-try:
-    import qutip as qt
-except ImportError as e:
-    pass
-    # logging.warning('Could not import qutip, tomo code will not work')
 
 def reshape_block(shots_data, segments_per_block=16, block_size=4092, mode='truncate'):
     """

@@ -259,7 +259,7 @@ err_cnt = instr.cc.get_system_error_count()
 if err_cnt>0:
     log.warning('CC status after upload')
 for i in range(err_cnt):
-    print(instr.cc.get_error())
+    print(instr.cc.get_system_error())
 
 log.debug('starting CC')
 instr.cc.start()
@@ -268,7 +268,7 @@ err_cnt = instr.cc.get_system_error_count()
 if err_cnt>0:
     log.warning('CC status after start')
 for i in range(err_cnt):
-    print(instr.cc.get_error())
+    print(instr.cc.get_system_error())
 
 
 

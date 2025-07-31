@@ -126,6 +126,7 @@ if 1:   # HDAWG
         nodes = instr.daq.listNodes('/', 7)
         with open("nodes.txt", "w") as file:
             file.write(str(nodes))
+
     #log.info(f"DIO delay is set to {instr.getd('raw/dios/0/delays/0')}")
     for awg in [0, 1, 2, 3]:
         log.info(f"AWG{awg} DIO delay is set to {instr.getd(f'awgs/{awg}/dio/delay/value')}")

@@ -26,7 +26,10 @@ from pycqed.instrument_drivers.library.Transport import Transport
 
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import Parameter
-from qcodes.instrument.parameter import Command
+try:  # Compatible with python 3.6
+    from qcodes.instrument.parameter import Command
+except ImportError:  # Compatible with python 3.7+ (tested until 3.9)
+    from qcodes.parameters.command import Command
 from qcodes import validators as vals
 
 log = logging.getLogger(__name__)
@@ -480,7 +483,7 @@ class QWGMultiDevices(DIO.CalInterface):
             qwg.stop()
 
         main_qwg = self.qwgs[0]
-        if main_qwg.dio_mode() is not 'MASTER':
+        if main_qwg.dio_mode() != 'MASTER':
             raise ValueError(f"First QWG ({main_qwg.name}) is not a DIO MASTER, therefore it is not possible the use it "
                              f"as base QWG for calibration of multiple QWGs.")
         main_qwg.dio_calibrate()

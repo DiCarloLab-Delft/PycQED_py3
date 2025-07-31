@@ -1,21 +1,18 @@
 import os
 import unittest
-import pytest
 import numpy as np
 
-#try:  # FIXME: hides import problems
-if 1:
-    from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
-    from pycqed.measurement.openql_experiments import openql_helpers as oqh
-    from openql import openql as ql
+from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
+from pycqed.measurement.openql_experiments import openql_helpers as oqh
+from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
 
+
+if oqh.is_compatible_openql_version_cc():
     class Test_single_qubit_seqs_CCL(unittest.TestCase):
         def setUp(self):
             curdir = os.path.dirname(__file__)
-            self.config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
-
-            output_dir = os.path.join(curdir, 'test_output')
-            ql.set_option('output_dir', output_dir)
+            self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
+            OqlProgram.output_dir = os.path.join(curdir, 'test_output_cc')
 
         def test_CW_tone(self):
             p = sqo.CW_tone(qubit_idx=1,
@@ -110,6 +107,7 @@ if 1:
                     [5, 8], ['0', '1', '+', '-'], gate_duration_ns=20,
                     echo=False, qubit_idx=0, platf_cfg=self.config_fn)
 
+        @unittest.skip("test_RTE() uses old style conditional gates, which are no longer implemented")
         def test_RTE(self):
             p = sqo.RTE(qubit_idx=0,
                         sequence_type='echo', net_gate='pi', feedback=True,
@@ -139,6 +137,7 @@ if 1:
                                              times=np.arange(0, 80e-9, 20e-9))
             self.assertEqual(p.name, 'FluxTimingCalibration_2q')
 
+        @unittest.skip("test_fast_feedback_control() uses old style conditional gates, which are no longer implemented")
         def test_fast_feedback_control(self):
             p = sqo.FastFeedbackControl(latency=200e-9,
                                         qubit_idx=0, platf_cfg=self.config_fn)
@@ -148,36 +147,8 @@ if 1:
             p = sqo.ef_rabi_seq(0, amps=np.linspace(0, 1, 11),
                                 platf_cfg=self.config_fn)
             self.assertEqual(p.name, 'ef_rabi_seq')
-
-    ##########################################################################
-    # repeat same tests for Qutech Central Controller
-    # NB: we just hijack the parent class to run the same tests
-    # NB: requires OpenQL with CC backend support
-    ##########################################################################
-
-    if oqh.is_compatible_openql_version_cc():
-        class Test_single_qubit_seqs_CC(Test_single_qubit_seqs_CCL):
-            def setUp(self):
-                curdir = os.path.dirname(__file__)
-                self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
-                output_dir = os.path.join(curdir, 'test_output_cc')
-                ql.set_option('output_dir', output_dir)
-
-            def test_RTE(self):
-                pytest.skip("test_RTE() uses conditional gates, which are not implemented yet")
-
-            def test_fast_feedback_control(self):
-                pytest.skip("test_fast_feedback_control() uses conditional gates, which are not implemented yet")
-    else:
-        class Test_single_qubit_seqs_CC_incompatible_openql_version(unittest.TestCase):
-            @unittest.skip('OpenQL version does not support CC')
-            def test_fail(self):
-                pass
-
-# FIXME: disabled
-# except ImportError as e:
-#     class Test_single_qubit_seqs_CCL_import_error(unittest.TestCase):
-#
-#         @unittest.skip('Missing dependency - ' + str(e))
-#         def test_fail(self):
-#             pass
+else:
+    class Test_single_qubit_seqs_CC_incompatible_openql_version(unittest.TestCase):
+        @unittest.skip('OpenQL version does not support CC')
+        def test_fail(self):
+            pass

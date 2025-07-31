@@ -2132,17 +2132,17 @@ def interp_to_1D_arr(x_int=None, y_int=None, z_int=None, slice_above_len=None):
     if slice_above_len is not None:
         if x_int is not None:
             size = np.size(x_int)
-            slice_step = np.int(np.ceil(size / slice_above_len))
+            slice_step = int(np.ceil(size / slice_above_len))
             x_int = np.array(x_int)[::slice_step]
         if y_int is not None:
             size = np.size(y_int)
-            slice_step = np.int(np.ceil(size / slice_above_len))
+            slice_step = int(np.ceil(size / slice_above_len))
             y_int = np.array(y_int)[::slice_step]
         if z_int is not None:
             size_0 = np.shape(z_int)[0]
             size_1 = np.shape(z_int)[1]
-            slice_step_0 = np.int(np.ceil(size_0 / slice_above_len))
-            slice_step_1 = np.int(np.ceil(size_1 / slice_above_len))
+            slice_step_0 = int(np.ceil(size_0 / slice_above_len))
+            slice_step_1 = int(np.ceil(size_1 / slice_above_len))
             z_int = np.array(z_int)[::slice_step_0, ::slice_step_1]
 
     if x_int is not None and y_int is not None and z_int is not None:

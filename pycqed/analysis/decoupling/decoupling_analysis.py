@@ -28,7 +28,7 @@ class DecouplingAnalysis:
         self.num_points = num_points
         self.filter_mask_vector = np.zeros((self.Ndac, self.Nq,
                                             self.num_points),
-                                           dtype=np.bool)
+                                           dtype=bool)
         self.filter_mask_vector[:, :, :] = False
         self.dac_instrument=dac_instrument
 

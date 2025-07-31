@@ -1,0 +1,588 @@
+// File:    config_cc_s17_direct_iq.json.in
+// notes:   requires OpenQL >= 0.10.2
+//          see https://openql.readthedocs.io/en/latest/gen/reference_architectures.html#qutech-central-controller for documentation of this file
+// author: 	Wouter Vlothuizen e.a.
+
+{
+	"eqasm_compiler" : "cc",
+
+	"hardware_settings": {
+        "qubit_number": 17,
+        "creg_number": 32,
+        "breg_number": 32,
+		"cycle_time" : 20,        // in [ns]
+
+        "eqasm_backend_cc": {
+
+            // Instruments used in this setup, their configuration and connectivity.
+            "instruments": [
+                // readout.
+                {
+                    "name": "ro_0",
+                    "qubits": [[1], [4], [5], [8], [10], [7], [11], [14], [15]],
+                    "signal_type": "measure",
+                    "ref_instrument_definition": "zi-uhfqa",
+                    "ref_control_mode": "uhfqa-9ch",
+                    "controller": {
+                        "name": "cc",
+                        "slot": 2,
+                        "io_module": "CC-CONN-DIO"
+                    }
+                },
+                {
+                    "name": "ro_1",
+                    "qubits": [[0], [2], [3], [6], [9], [12], [], [], []],
+                    "signal_type": "measure",
+                    "ref_instrument_definition": "zi-uhfqa",
+                    "ref_control_mode": "uhfqa-9ch",
+                    "controller": {
+                        "name": "cc",
+                        "slot": 4,
+                        "io_module": "CC-CONN-DIO"
+                    }
+                },
+                {
+                    "name": "ro_2",
+                    "qubits": [[13], [16], [], [], [], [], [], [], []],
+                    "signal_type": "measure",
+                    "ref_instrument_definition": "zi-uhfqa",
+                    "ref_control_mode": "uhfqa-9ch",
+                    "controller": {
+                        "name": "cc",
+                        "slot": 5,
+                        "io_module": "CC-CONN-DIO"
+                    }
+                },
+
+                // microwave.
+                {
+                    "name": "mw_0",
+                    "qubits": [                                             // data qubits:
+                        [8],
+                        [9],
+                        [14],
+                        [15]
+                    ],
+                    "signal_type": "mw",
+                    "ref_instrument_definition": "zi-hdawg",
+                    "ref_control_mode": "awg8-mw-direct-iq",
+                    "controller": {
+                        "name": "cc",
+                        "slot": 0,
+                        "io_module": "CC-CONN-DIO-DIFF"
+                    }
+                },
+                {
+                    "name": "mw_1",
+                    "qubits": [                                             // ancilla qubits:
+                        [11],
+                        [10],
+                        [12],
+                        []
+                    ],
+                    "signal_type": "mw",
+                    "ref_instrument_definition": "zi-hdawg",
+                    "ref_control_mode": "awg8-mw-direct-iq",
+                    "controller": {
+                        "name": "cc",
+                        "slot": 1,
+                        "io_module": "CC-CONN-DIO-DIFF"
+                    }
+                },
+                {
+                    "name": "mw_2",
+                    "qubits": [                                             // data qubits:
+                        [0],
+                        [1],
+                        [2],
+                        [3]
+                    ],
+                    "signal_type": "mw",
+                    "ref_instrument_definition": "zi-hdawg",
+                    "ref_control_mode": "awg8-mw-direct-iq",
+                    "controller": {
+                        "name": "cc",
+                        "slot": 6,
+                        "io_module": "CC-CONN-DIO-DIFF"
+                    }
+                },
+                {
+                    "name": "mw_3",
+                    "qubits": [                                             // ancilla qubits:
+                        [4],
+                        [5],
+                        [6],
+                        [7]
+                    ],
+                    "signal_type": "mw",
+                    "ref_instrument_definition": "zi-hdawg",
+                    "ref_control_mode": "awg8-mw-direct-iq",
+                    "controller": {
+                        "name": "cc",
+                        "slot": 7,
+                        "io_module": "CC-CONN-DIO-DIFF"
+                    }
+                },
+                {
+                    "name": "mw_4",
+                    "qubits": [                                             // ancilla qubits:
+                        [13],
+                        [16],
+                        [],
+                        []
+                    ],
+                    "signal_type": "mw",
+                    "ref_instrument_definition": "zi-hdawg",
+                    "ref_control_mode": "awg8-mw-direct-iq",
+                    "controller": {
+                        "name": "cc",
+                        "slot": 8,
+                        "io_module": "CC-CONN-DIO-DIFF"
+                    }
+                },
+                // flux
+                {
+                    "name": "flux_0",
+                    "qubits": [[8], [9], [10], [11], [12], [13], [14], [15]],
+                    "signal_type": "flux",
+                    "ref_instrument_definition": "zi-hdawg",
+                    "ref_control_mode": "awg8-flux",
+                    "controller": {
+                        "name": "cc",
+                        "slot": 3,
+                        "io_module": "CC-CONN-DIO-DIFF"
+                    }
+                },
+                {
+                    "name": "flux_1",
+                    "qubits": [[0], [1], [2], [3], [4], [5], [6], [7]],
+                    "signal_type": "flux",
+                    "ref_instrument_definition": "zi-hdawg",
+                    "ref_control_mode": "awg8-flux",
+                    "controller": {
+                        "name": "cc",
+                        "slot": 9,
+                        "io_module": "CC-CONN-DIO-DIFF"
+                    }
+                },
+                {
+                    "name": "flux_2",
+                    "qubits": [[16], [], [], [], [], [], [], []],
+                    "signal_type": "flux",
+                    "ref_instrument_definition": "zi-hdawg",
+                    "ref_control_mode": "awg8-flux",
+                    "controller": {
+                        "name": "cc",
+                        "slot": 10,
+                        "io_module": "CC-CONN-DIO-DIFF"
+                    }
+                }
+            ], // instruments
+
+#include "common_eqasm_backend_cc.json.in"
+
+		}  // eqasm_backend_cc
+	},  // hardware_settings
+
+    "gate_decomposition": {
+#include "common_gate_decomposition.json.in"
+
+        // NB: is is not possible to decompose 'new style' decompositions into these 'legacy'
+        // decompositions. Trying so will result in: "the duration of the schedule of the decomposition
+        // (18446744073709551615) cannot be longer than the duration of the to-be-decomposed instruction (2)"
+        // Since this is not easily solved and the new system is far better anyway (although slightly more verbose)
+        // we won't solve that.
+
+//        ,
+
+        // gate decompositions for S17, using new CZ helpers
+//        "cz q8,q10":   ["_cz_sw_ne_park q8,q10,q11"],
+//        "cz q10,q8":   ["_cz_sw_ne_park q8,q10,q11"],
+//        "cz q8,q11":   ["_cz_se_nw_park q8,q11,q10"],
+//        "cz q11,q8":   ["_cz_se_nw_park q8,q11,q10"],
+//        "cz q11,q14":  ["_cz_sw_ne_park q11,q14,q15"],
+//        "cz q14,q11":  ["_cz_sw_ne_park q11,q14,q15"],
+//        "cz q10,q14":  ["_cz_se_nw q10,q14"],
+//        "cz q14,q10":  ["_cz_se_nw q10,q14"],
+//        "cz q9,q11":   ["_cz_sw_ne_park q9,q11,q12"],
+//        "cz q11,q9":   ["_cz_sw_ne_park q9,q11,q12"],
+//        "cz q9,q12":   ["_cz_se_nw_park q9,q12,q11"],
+//        "cz q12,q9":   ["_cz_se_nw_park q9,q12,q11"],
+//        "cz q11,q15":  ["_cz_se_nw_park q11,q15,q14"],
+//        "cz q15,q11":  ["_cz_se_nw_park q11,q15,q14"],
+//        "cz q12,q15":  ["_cz_sw_ne q12,q15"],
+//        "cz q15,q12":  ["_cz_sw_ne q12,q15"]
+
+
+        // FIXME: "flux_dance_*" ripped from config_cc_s17_direct_iq.json.in:
+        // - changed "-" to "_" because of new naming conventions
+        // - cleanup/rewrite along lines of new CZ helpers
+        // - disabled because target instructions must exist
+
+        // 2. flux-dance with hard-coded CZ gates in parallel.
+        // Qubits are ordered in sf_cz target, control.
+
+          // FIXME: test for Hani
+//        "flux_dance_1 q0": ["barrier q3, q5, q16, q8, q11, q2, q1, q10, q14, q6",
+//                            "sf_cz_ne q3", "sf_cz_sw q5", "sf_cz_sw q16", "sf_cz_ne q8", "sf_cz_ne q11", "sf_cz_sw q2",
+//                            "sf_park q1", "sf_park q10", "sf_park q14","sf_park q6",
+//                            "barrier q3, q5, q16, q8, q11, q2, q1, q10, q14, q6"]
+
+//        "flux_dance_1 q0": ["barrier q3, q5, q16, q8, q11, q2, q1, q10, q14, q6",
+//                            "sf_cz_ne q3", "sf_cz_sw q5", "sf_cz_sw q16", "sf_cz_ne q8", "sf_cz_ne q11", "sf_cz_sw q2",
+//                            "sf_park q1", "sf_park q10", "sf_park q14","sf_park q6",
+//                            "barrier q3, q5, q16, q8, q11, q2, q1, q10, q14, q6"],
+//
+//
+//        "flux_dance_2 q0": ["barrier q3, q1, q13, q8, q11, q6, q5, q10, q7, q2",
+//                            "sf_cz_nw q3", "sf_cz_se q1", "sf_cz_se q13", "sf_cz_nw q8", "sf_cz_nw q11", "sf_cz_se q6",
+//                             "sf_park q5", "sf_park q10", "sf_park q7","sf_park q2",
+//                             "barrier q3, q1, q13, q8, q11, q6, q5, q10, q7, q2"],
+//
+//        "flux_dance_3 q0": ["barrier q9, q4, q13, q3, q8, q0, q5, q10, q7, q2",
+//                            "sf_cz_se q9", "sf_cz_nw q4", "sf_cz_nw q13", "sf_cz_se q3", "sf_cz_se q8", "sf_cz_nw q0",
+//                             "sf_park q5", "sf_park q10", "sf_park q7","sf_park q2",
+//                             "barrier q9, q4, q13, q3, q8, q0, q5, q10, q7, q2"],
+//
+//        "flux_dance_4 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0",
+//                            "sf_cz_sw q9", "sf_cz_ne q5", "sf_cz_ne q15", "sf_cz_sw q3", "sf_cz_sw q8", "sf_cz_ne q2",
+//                             "sf_park q4", "sf_park q12", "sf_park q7","sf_park q0",
+//                             "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0"],
+//
+//        "flux_dance_5 q0": ["barrier q12, q1, q13, q7, q10, q4, q8, q3, q5",
+//                            "sf_cz_ne q12", "sf_cz_sw q1", "sf_cz_sw q13", "sf_cz_ne q7", "sf_cz_ne q10", "sf_cz_sw q4",
+//                             "sf_park q8", "sf_park q3", "sf_park q5",
+//                             "barrier q12, q1, q13, q7, q10, q4, q8, q3, q5"],
+//
+//        "flux_dance_6 q0": ["barrier q15, q12, q7, q2, q16, q10, q8, q3, q6, q14",
+//                            "sf_cz_nw q15", "sf_cz_se q12", "sf_cz_se q7", "sf_cz_nw q2", "sf_cz_nw q16", "sf_cz_se q10",
+//                             "sf_park q8", "sf_park q3", "sf_park q6", "sf_park q14",
+//                             "barrier q15, q12, q7, q2, q16, q10, q8, q3, q6, q14"],
+//
+//        "flux_dance_7 q0": ["barrier q15, q7, q10, q5, q16, q14, q8, q3, q4, q12",
+//                            "sf_cz_se q15", "sf_cz_nw q7", "sf_cz_nw q10", "sf_cz_se q5", "sf_cz_se q16", "sf_cz_nw q14",
+//                             "sf_park q8", "sf_park q3", "sf_park q4", "sf_park q12",
+//                             "barrier q15, q7, q10, q5, q16, q14, q8, q3, q4, q12"],
+//
+//        "flux_dance_8 q0": ["barrier q7, q6, q13, q10, q14, q0, q8, q3, q2",
+//                            "sf_cz_sw q7", "sf_cz_ne q6", "sf_cz_ne q13", "sf_cz_sw q10", "sf_cz_sw q14", "sf_cz_ne q0",
+//                             "sf_park q8", "sf_park q3", "sf_park q2",
+//                             "barrier q7, q6, q13, q10, q14, q0, q8, q3, q2"],
+//
+//
+//        // // // Qubits are ordered in sf_cz target, control.
+//        "flux_dance_1_refocus q0": ["barrier q3, q5, q16, q8, q11, q2, q1, q10, q14, q6, q0, q7, q15, q13, q12, q4, q9",
+//                                    "sf_cz_ne q3", "sf_cz_sw q5","sf_cz_sw q16", "sf_cz_ne q8", "sf_cz_ne q11", "sf_cz_sw q2",
+//                                    "sf_park q1", "sf_park q10", "sf_park q14","sf_park q6",
+//                                    "cw_01 q0", "cw_01 q15", "cw_01 q13", "cw_01 q4", "cw_01 q9",
+//                                    "cw_27 q0", "cw_27 q15", "cw_27 q13", "cw_27 q4", "cw_27 q9",
+//                                    "barrier q3, q5, q16, q8, q11, q2, q1, q10, q14, q6, q0, q7, q15, q13, q12, q4, q9"],
+//
+//        "flux_dance_2_refocus q0": ["barrier q3, q1, q13, q8, q11, q6, q5, q10, q7, q2, q15, q4, q0, q9, q12, q16, q14",
+//                                    "sf_cz_nw q3", "sf_cz_se q1","sf_cz_se q13", "sf_cz_nw q8", "sf_cz_nw q11", "sf_cz_se q6",
+//                                    "sf_park q5", "sf_park q10", "sf_park q7","  q2",
+//                                    "cw_01 q15", "cw_01 q4", "cw_01 q0", "cw_01 q9", "cw_01 q16",
+//                                    "cw_27 q15", "cw_27 q4", "cw_27 q0", "cw_27 q9", "cw_27 q16",
+//                                    "barrier q3, q1, q13, q8, q11, q6, q5, q10, q7, q2, q15, q4, q0, q9, q12, q16, q14"],
+//
+//        "flux_dance_3_refocus q0": ["barrier q9, q4, q13, q3, q8, q0, q5, q10, q7, q2, q14, q16, q1, q12, q15, q6, q11",
+//                                    "sf_cz_se q9", "sf_cz_nw q4","sf_cz_nw q13", "sf_cz_se q3", "sf_cz_se q8", "sf_cz_nw q0",
+//                                    "sf_park q5", "sf_park q10", "sf_park q7","sf_park q2",
+//                                    "cw_01 q16", "cw_01 q1", "cw_01 q15", "cw_01 q6", "cw_01 q11",
+//                                    "cw_27 q16", "cw_27 q1", "cw_27 q15", "cw_27 q6", "cw_27 q11",
+//                                    "barrier q9, q4, q13, q3, q8, q0, q5, q10, q7, q2, q14, q16, q1, q12, q15, q6, q11"],
+//
+//        "flux_dance_4_refocus q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
+//                                    "sf_cz_sw q9", "sf_cz_ne q5", "sf_cz_ne q15", "sf_cz_sw q3", "sf_cz_sw q8", "sf_cz_ne q2",
+//                                    "sf_park q4", "sf_park q12", "sf_park q7","sf_park q0",
+//                                    "cw_01 q1", "cw_01 q16", "cw_01 q13", "cw_01 q11", "cw_01 q6",
+//                                    "cw_27 q1", "cw_27 q16", "cw_27 q13", "cw_27 q11", "cw_27 q6",
+//                                    "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"],
+//
+//        "flux_dance_5_refocus q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
+//                                    "sf_cz_ne q12", "sf_cz_sw q1",
+//                                    "sf_cz_sw q13", "sf_cz_ne q7", "sf_cz_ne q10", "sf_cz_sw q4",
+//                                     "sf_park q8", "sf_park q3", "sf_park q5",
+//                                     "cw_01 q15", "cw_01 q6", "cw_01 q0", "cw_01 q2", "cw_01 q16",
+//                                     "cw_27 q15", "cw_27 q6", "cw_27 q0", "cw_27 q2", "cw_27 q16",
+//                                     "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"],
+//
+//        "flux_dance_6_refocus q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
+//                                     "sf_cz_nw q15", "sf_cz_se q12",
+//                                     "sf_cz_se q7", "sf_cz_nw q2", "sf_cz_nw q16", "sf_cz_se q10",
+//                                     "sf_park q8", "sf_park q3", "sf_park q6", "sf_park q14",
+//                                     "cw_01 q1", "cw_01 q5", "cw_01 q4", "cw_01 q13", "cw_01 q0",
+//                                     "cw_27 q1", "cw_27 q5", "cw_27 q4", "cw_27 q13", "cw_27 q0",
+//                                     "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"],
+//
+//        "flux_dance_7_refocus q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
+//                                     "sf_cz_se q15", "sf_cz_nw q7",
+//                                     "sf_cz_nw q10", "sf_cz_se q5", "sf_cz_se q16", "sf_cz_nw q14",
+//                                     "sf_park q8", "sf_park q3", "sf_park q4", "sf_park q12",
+//                                     "cw_01 q1", "cw_01 q13", "cw_01 q6", "cw_01 q2", "cw_01 q0",
+//                                     "cw_27 q1", "cw_27 q13", "cw_27 q6", "cw_27 q2", "cw_27 q0",
+//                                     "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"],
+//
+//        "flux_dance_8_refocus q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
+//                                     "sf_cz_sw q7", "sf_cz_ne q6",
+//                                     "sf_cz_ne q13", "sf_cz_sw q10", "sf_cz_sw q14", "sf_cz_ne q0",
+//                                     "sf_park q8", "sf_park q3", "sf_park q2",
+//                                     "cw_01 q1", "cw_01 q5", "cw_01 q4", "cw_01 q15", "cw_01 q16",
+//                                     "cw_27 q1", "cw_27 q5", "cw_27 q4", "cw_27 q15", "cw_27 q16",
+//                                     "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"]
+},  // gate_decomposition
+
+	"instructions": {
+#include "common_instructions.json.in"
+
+        ,
+
+        //****************************************************************
+        // decompositions, new style, require OpenQL>=0.10.2
+        // see https://openql.readthedocs.io/en/latest/gen/reference_configuration.html#instructions-section
+        // Should be compatible with API, and cQASM1.2
+        //
+        // Note that for historical reasons, qubits referred to in the instruction name don't use "[]" (e.g. "q8"),
+        // whereas the decomposition/into key requires them (e.g. "q[8]"), because it uses cQASM syntax
+        //
+        // OpenQL>=0.10.3 allows automatic calculation of decomposition duration if duration=0 is specified
+        //****************************************************************
+
+
+        // was:         "measure_fb %0": ["measure %0", "_wait_uhfqa %0", "_dist_dsm %0", "_wait_dsm %0"],
+//        "measure_fb": {
+//            "prototype": ["U:qubit", "U:bit"],
+//            "duration": 0,
+//            "decomposition": {
+//                "into": "measure op(0),op(1); _wait_uhfqa op(0); _dist_dsm op(0); _wait_dsm op(0)"
+//            }
+//        }
+//,
+
+        // CZ decompositions for S17, using new CZ helpers
+        // Note the use of 'hierarchical gate decomposition' for every 2nd entry
+        "cz q8,q10": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "_cz_sw_ne_park q[8],q[10],q[11]"
+            }
+        },
+        "cz q10,q8": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "cz q[8],q[10]"
+            }
+        },
+
+        "cz q8,q11": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "_cz_se_nw_park q[8],q[11],q[10]"
+            }
+        },
+        "cz q11,q8": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "cz q[8],q[11]"
+            }
+        },
+
+        "cz q11,q14": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "_cz_sw_ne_park q[11],q[14],q[15]"
+            }
+        },
+        "cz q14,q11": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "cz q[11],q[14]"
+            }
+        },
+
+        "cz q10,q14": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "_cz_se_nw q[10],q[14]"
+            }
+        },
+        "cz q14,q10": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "cz q[10],q[14]"
+            }
+        },
+
+        "cz q9,q11": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "_cz_sw_ne_park q[9],q[11],q[12]"
+            }
+        },
+        "cz q11,q9": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "cz q[9],q[11]"
+            }
+        },
+
+        "cz q9,q12": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "_cz_se_nw_park q[9],q[12],q[11]"
+            }
+        },
+        "cz q12,q9": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "cz q[9],q[12]"
+            }
+        },
+
+        "cz q11,q15": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "_cz_se_nw_park q[11],q[15],q[14]"
+            }
+        },
+        "cz q15,q11": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "cz q[11],q[15]"
+            }
+        },
+
+        "cz q12,q15": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "_cz_sw_ne q[12],q[15]"
+            }
+        },
+        "cz q15,q12": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "cz q[12],q[15]"
+            }
+        },
+
+        // Hierarchical gate decompositions (test)
+
+		// Flux dance decompositions (test)
+        "_fluxdance_conflict": {
+            "prototype": [],
+            "duration": 0,
+            "decomposition": {
+                "into": "{ cz q[8],q[10] | cz q[9],q[11] }" // FIXME: in custom instruction '_cz_sw_ne_park <Z:qubit> q[8], <Z:qubit> q[10], <I:qubit> q[11]': Signal conflict on instrument='flux_0', group=3, between '{type:idle_z,which:NE}' and '{type:park}'
+            }
+        },
+        "_fluxdance_1": {
+            "prototype": [],
+            "duration": 0,
+            "decomposition": {
+                "into": "{ cz q[10],q[8] | cz q[9],q[12] }"  // NB: both CZs park q[11]
+            }
+        },
+
+        // Parameterized gate decompositions (test)
+        "_test_rotate": {
+           "prototype": ["X:qubit", "L:int"],
+           "duration": @MW_DURATION@,
+           "decomposition": {
+               "into": [  // FIXME: makes no real sense, and currently fails in backend
+                    "if (op(1) < 45) {",
+                    "   rx45 op(0)",
+                    "} else {",
+                    "   rx90 op(0)",
+                    "}"
+                ]
+           }
+        },
+
+        // Randomized banchmarking (test)
+        // based on TwoQubitClifford::gate_decomposition
+        "_test_decompose_2q_clifford": {
+           "prototype": ["X:qubit", "X:qubit", "L:int"],
+           "duration": @MW_DURATION@,  // FIXME: depends
+           "decomposition": {
+               "into": [  // FIXME: currently fails in backend
+                    "if (op(2) < 576) {",
+//                    "   _test_single_qubit_like_gates op(0),op(1),op(2)",
+                    "   rx90 op(0)",
+                    "} else if (op(2) < 576 + 5184) {",
+//                    "   _test_CNOT_like_gates op(0),op(1),op(2)",
+                    "   rx90 op(0)",
+                    "}" // FIXME: etc
+                ]
+           }
+        },
+        "_test_single_qubit_like_gates": {
+           "prototype": ["X:qubit", "X:qubit", "L:int"],
+           "duration": @MW_DURATION@,  // FIXME: depends
+           "decomposition": {
+               "into": [  // FIXME: currently fails in backend
+                ]
+           }
+        },
+        "_test_CNOT_like_gates": {
+           "prototype": ["X:qubit", "X:qubit", "L:int"],
+           "duration": @MW_DURATION@,  // FIXME: depends
+           "decomposition": {
+               "into": [  // FIXME: currently fails in backend
+                ]
+           }
+        },
+
+        // Refocussing (test)
+        // CZ with park and refocus
+        "__cz_sw_ne_park_refocus": {
+            "prototype": ["Z:qubit", "Z:qubit", "I:qubit"],
+            "duration": @FLUX_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "flux",
+                        "operand_idx": 0,
+                        "value": { "type": "cz",  "which": "SW" }
+                    },
+                    {
+                        "type": "flux",
+                        "operand_idx": 1,
+                        "value": { "type": "idle_z",  "which": "NE" }
+                    },
+                    {
+                        "type": "flux",
+                        "operand_idx": 2,
+                        "value": { "type": "park" }
+                    },
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_27"}  // FIXME
+                    }
+                ],
+                "static_codeword_override": [3,1,5,27]
+            }
+        }
+
+        },	// instructions
+
+#include "common_keys.json.in"
+
+	}  // hardware_settings
+}

@@ -96,7 +96,7 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
         self.seti('raw/error/blinkforever', 1)
 
         t1 = time.time()
-        log.info('{}: Initialized ZI_HDAWG_core in {}s'.format(self.devname, t1-t0))
+        log.info(f"{self.devname}: Initialized ZI_HDAWG_core in {t1 - t0:.3}s")
 
     def _check_devtype(self):
         if self.devtype != 'HDAWG8' and self.devtype != 'HDAWG4':

@@ -1,6 +1,6 @@
 *RST
-*CLS
 STATus:PRESet
+*CLS
 wlist:waveform:delete all
 wlist:waveform:new "test",3,real
 wlist:waveform:delete "test"

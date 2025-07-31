@@ -225,7 +225,7 @@ else:
     log.debug('checking for SCPI errors on CC')
     err_cnt = cc.get_system_error_count()
     for i in range(err_cnt):
-        print(cc.get_error())
+        print(cc.get_system_error())
     log.debug('done checking for SCPI errors on CC')
 
     log.debug('starting CC')

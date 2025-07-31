@@ -197,7 +197,7 @@ def get_eta(r_off,r_ol,r_cl, u_r_off = 0.003, u_r_ol = 0.003, u_r_cl = 0.003):
 
 def PSD(array, time_step):
     """
-    PSD function by Niels
+    PSD function (Power Spectral Density) by Niels
     """
     f_axis = np.fft.fftfreq(len(array), time_step)
     idx = np.argsort(f_axis)

@@ -5,6 +5,7 @@ This file contains pauli transfer matrices for all basic qubit operations.
 
 
 I = np.eye(4)
+
 # Pauli group
 X = np.array([[1, 0, 0, 0],
               [0, 1, 0, 0],
@@ -26,7 +27,9 @@ S = np.array([[1, 0, 0, 0],
               [0, 0, 0, 1],
               [0, 1, 0, 0],
               [0, 0, 1, 0]], dtype=int)
+
 S2 = np.dot(S, S)
+
 # Hadamard group
 H = np.array([[1, 0, 0, 0],
               [0, 0, 0, 1],

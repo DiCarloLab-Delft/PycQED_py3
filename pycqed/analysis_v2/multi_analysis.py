@@ -2,6 +2,7 @@ import os
 import matplotlib.pylab as pl
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
+from collections import OrderedDict
 import numpy as np
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
@@ -257,6 +258,7 @@ class Multi_Ramsey_Analysis(ba.BaseDataAnalysis):
         do_fitting: bool = False,
         save_qois: bool = True,
         auto=True,
+        device = None,
         qubits: list = None,
         times: list = None,
         artificial_detuning: float = None
@@ -266,6 +268,7 @@ class Multi_Ramsey_Analysis(ba.BaseDataAnalysis):
             t_start = ts
         )
         
+        self.device = device
         self.qubits = qubits
         self.times= times
         if artificial_detuning is None:
@@ -286,9 +289,11 @@ class Multi_Ramsey_Analysis(ba.BaseDataAnalysis):
         for i, q in enumerate(self.qubits):
             self.raw_data_dict['{}_data'.format(q)] = data['data'][:,i+1]
             self.raw_data_dict['{}_times'.format(q)] = self.times[i]
-            param_spec_old_freq = {'{}_freq_old'.format(q): ('Instrument settings/{}'.format(q), 'attr:freq_qubit')}
-            old_freq = h5d.extract_pars_from_datafile(data_fp, param_spec_old_freq)
-            self.raw_data_dict['{}_freq_old'.format(q)] = float(old_freq['{}_freq_old'.format(q)])
+
+            qubit_object = self.device.find_instrument(q)
+            old_freq = qubit_object.freq_qubit()
+
+            self.raw_data_dict['{}_freq_old'.format(q)] = old_freq
         self.raw_data_dict['folder'] = os.path.dirname(data_fp)
         
     def process_data(self):
@@ -719,57 +724,241 @@ class Multi_Flipping_Analysis(ba.BaseDataAnalysis):
             ### fit to normalized data ###
             x = number_flips[:-4]
             y = self.proc_data_dict['{}_nor_data'.format(q)][0:-4]
-            
-                    ### cos fit ###
-            cos_fit_mod = fit_mods.CosModel
-            params = cos_fit_mod.guess(cos_fit_mod,data=y,t=x)
-            cos_mod = lmfit.Model(fit_mods.CosFunc)
-            fit_res_cos = cos_mod.fit(data=y,t=x,params = params)
-            
-            t = np.linspace(x[0],x[-1],200)
-            cos_fit = fit_mods.CosFunc(t = t ,amplitude = fit_res_cos.best_values['amplitude'],
-                                   frequency = fit_res_cos.best_values['frequency'],
-                                   phase = fit_res_cos.best_values['phase'],
-                                   offset = fit_res_cos.best_values['offset'])
-            self.proc_data_dict['{}_cos_fit_data'.format(q)] = cos_fit
-            self.proc_data_dict['{}_cos_fit_res'.format(q)] = fit_res_cos
-            self.proc_data_dict['quantities_of_interest'][q]['cos_fit'] = fit_res_cos.best_values
-            
-            
-                
-                    ### line fit ###
-            poly_mod = lmfit.models.PolynomialModel(degree=1)
-            c0_guess = x[0]
-            c1_guess = (y[-1]-y[0])/(x[-1]-x[0])
-            poly_mod.set_param_hint('c0',value=c0_guess,vary=True)
-            poly_mod.set_param_hint('c1',value=c1_guess,vary=True)
-            poly_mod.set_param_hint('frequency', expr='-c1/(2*pi)')
-            params = poly_mod.make_params()
-            fit_res_line = poly_mod.fit(data=y,x=x,params = params)
-            self.proc_data_dict['{}_line_fit_data'.format(q)] = fit_res_line.best_fit
-            self.proc_data_dict['{}_line_fit_res'.format(q)] = fit_res_line
-            self.proc_data_dict['quantities_of_interest'][q]['line_fit'] = fit_res_line.best_values
-            ### calculating scale factors###
-            sf_cos = (1+fit_res_cos.params['frequency'])**2
-            phase = np.rad2deg(fit_res_cos.params['phase'])%360
-            if phase > 180:
-                sf_cos = 1/sf_cos
+
+            self.prepare_fitting(x=x, y=y)
+            self.run_fitting()
+
+            self.proc_data_dict['{}_cos_fit_data'.format(q)] = self.fit_dicts["cos_fit"]["fit_res"].best_fit
+            self.proc_data_dict['{}_cos_fit_res'.format(q)] = self.fit_dicts["cos_fit"]["fit_res"]
+            self.proc_data_dict['quantities_of_interest'][q]['cos_fit'] = self.fit_dicts["cos_fit"]["fit_res"].best_values
+
+            self.proc_data_dict['{}_line_fit_data'.format(q)] = self.fit_dicts["line_fit"]["fit_res"].best_fit
+            self.proc_data_dict['{}_line_fit_res'.format(q)] = self.fit_dicts["line_fit"]["fit_res"]
+            self.proc_data_dict['quantities_of_interest'][q]['line_fit'] = self.fit_dicts["line_fit"]["fit_res"].best_values
+
+            sf_cos = self.get_scale_factor_cos()
             self.proc_data_dict['quantities_of_interest'][q]['cos_fit']['sf'] = sf_cos
-            
-            sf_line = (1+fit_res_line.params['frequency'])**2
+
+            sf_line = self.get_scale_factor_line()
             self.proc_data_dict['quantities_of_interest'][q]['line_fit']['sf'] = sf_line
             ### choose correct sf ###
             msg = 'Scale factor based on '
-            if fit_res_line.bic<fit_res_cos.bic:
+            if self.fit_dicts["line_fit"]["fit_res"].bic < self.fit_dicts["cos_fit"]["fit_res"].bic:
                 scale_factor = sf_line
                 msg += 'line fit\n'   
             else:
                 scale_factor = sf_cos
                 msg += 'cos fit\n'
             msg += 'line fit: {:.4f}\n'.format(sf_line)
-            msg += 'cos fit: {:.4f}'.format(scale_factor)
+            msg += 'cos fit: {:.4f}'.format(sf_cos)
             self.proc_data_dict['{}_scale_factor'.format(q)] = scale_factor
             self.proc_data_dict['{}_scale_factor_msg'.format(q)] = msg
+
+    def prepare_fitting(self, x, y):
+        self.fit_dicts = OrderedDict()
+
+
+        # Sinusoidal fit
+        # --------------
+        # Even though we expect an exponentially damped oscillation we use
+        # a simple cosine as this gives more reliable fitting and we are only
+        # interested in extracting the oscillation frequency.
+        cos_mod = lmfit.Model(fit_mods.CosFunc)
+
+        guess_pars = fit_mods.Cos_guess(
+            model=cos_mod,
+            t=x,
+            data=y,
+        )
+
+        # constrain the amplitude to positive and close to 0.5 
+        guess_pars["amplitude"].value = 0.45
+        guess_pars["amplitude"].vary = True
+        guess_pars["amplitude"].min = 0.4
+        guess_pars["amplitude"].max = 0.5
+
+        # force the offset to 0.5
+        guess_pars["offset"].value = 0.5
+        guess_pars["offset"].vary = False   
+        
+
+        guess_pars["phase"].vary = True
+ 
+        guess_pars["frequency"].vary = True
+
+        self.fit_dicts["cos_fit"] = {
+            "fit_fn": fit_mods.CosFunc,
+            "fit_xvals": {"t": x},
+            "fit_yvals": {"data": y},
+            "guess_pars": guess_pars,
+        }
+
+        # Linear fit
+        #-----------
+        # In the case that the amplitude is close to perfect, we will not see a full period of oscillation. 
+        # We resort to a linear fit to extract the oscillation frequency from the slop of the best fit 
+        poly_mod = lmfit.models.PolynomialModel(degree=1)
+        # for historical reasons, the slope 'c1' is here converted to a frequency.
+        poly_mod.set_param_hint("frequency", expr="-c1/(2*pi)")
+        guess_pars = poly_mod.guess(
+            x=x,
+            data=y,
+        )
+        # Constrain the offset close to nominal 0.5
+        guess_pars["c0"].value = 0.5
+        guess_pars["c0"].vary = True
+        guess_pars["c0"].min = 0.45
+        guess_pars["c0"].max = 0.55
+        
+
+        self.fit_dicts["line_fit"] = {
+            "model": poly_mod,
+            "fit_xvals": {"x": x},
+            "fit_yvals": {"data": y},
+            "guess_pars": guess_pars,
+        }
+
+    def get_scale_factor_cos(self):
+        
+        # extract the frequency 
+        frequency = self.fit_dicts["cos_fit"]["fit_res"].params["frequency"]
+        
+        # extract phase modulo 2pi
+        phase = np.mod(self.fit_dicts["cos_fit"]["fit_res"].params["phase"],2*np.pi)
+        
+        # resolve ambiguity in the fit, making sign of frequency meaningful.
+        frequency*=np.sign(phase-np.pi)
+
+        # calculate the scale factor
+        scale_factor = 1 / (1 + 2*frequency)
+
+        return scale_factor
+
+    def get_scale_factor_line(self):
+
+        # extract the slope
+        frequency = self.fit_dicts["line_fit"]["fit_res"].params["frequency"]
+        
+
+        scale_factor = 1 / (1 - 4 * frequency)
+        # no phase sign check is needed here as this is contained in the
+        # sign of the coefficient
+
+        return scale_factor
+
+    def run_fitting(self):
+        '''
+        This function does the fitting and saving of the parameters
+        based on the fit_dict options.
+
+
+        There are two ways of fitting, specified in fit_dict['fitting_type']
+
+        - Using the model-fit procedure of lmfit, this is the default
+                fit_dict['fitting_type'] = 'model'
+        - Using the minimizer routine of lmfit, this needs to be specified by
+                fit_dict['fitting_type'] = 'minimize'
+
+
+        Initial guesses can be passed on in several different ways.
+
+        - as fit_dict['guess_pars'] directly as the model with guess parameters,
+                that needs to be made in the respective analysis and passed on
+                like fit_dict['guess_pars'] = model.make_params()
+                If this argument is passed on, no other guesses will be performed.
+                This is not implemented yet for the 'minimize' fitting type.
+
+        - as a guess function that will be run. This can be passed explicitly as
+                fit_dict['fit_guess_fn']
+                or also by giving the model specified in fit_dict['model'] an
+                argument .guess
+                The guess function can be given parameters in
+                fit_dict['guessfn_pars']
+
+        - as fit_dict['guess_dict'], which is a dictionary containing the guess
+                parameters. These guess parameters will converted into the parameter
+                objects required by either model fit or minimize.
+
+        '''
+        from pycqed.analysis_v2.base_analysis import _complex_residual_function
+
+        self.fit_res = {}
+        for key, fit_dict in self.fit_dicts.items():
+            guess_dict = fit_dict.get('guess_dict', None)
+            guess_pars = fit_dict.get('guess_pars', None)
+            guessfn_pars = fit_dict.get('guessfn_pars', {})
+            fit_yvals = fit_dict['fit_yvals']
+            fit_xvals = fit_dict['fit_xvals']
+
+            fitting_type = fit_dict.get('fitting_type', 'model')
+
+            model = fit_dict.get('model', None)
+            if model is None:
+                fit_fn = fit_dict.get('fit_fn', None)
+                model = fit_dict.get('model', lmfit.Model(fit_fn))
+            fit_guess_fn = fit_dict.get('fit_guess_fn', None)
+            if fit_guess_fn is None:
+                if fitting_type == 'model' and fit_dict.get('fit_guess', True):
+                    fit_guess_fn = model.guess
+
+            if guess_pars is None:  # if you pass on guess_pars, immediately go to the fitting
+                if fit_guess_fn is not None:  # Run the guess funtions here
+                    if fitting_type == 'minimize':
+                        guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals, **guessfn_pars)
+                        params = lmfit.Parameters()
+                        for gd_key, val in guess_pars.items():
+                            params.add(gd_key)
+                            for attr, attr_val in val.items():
+                                setattr(params[gd_key], attr, attr_val)
+
+                    # a fit function should return lmfit parameter objects
+                    # but can also work by returning a dictionary of guesses
+                    elif fitting_type == 'model':
+                        guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals, **guessfn_pars)
+                        if not isinstance(guess_pars, lmfit.Parameters):
+                            for gd_key, val in list(guess_pars.items()):
+                                model.set_param_hint(gd_key, **val)
+                            guess_pars = model.make_params()
+
+                        # A guess can also be specified as a dictionary.
+                        # additionally this can be used to overwrite values
+                        # from the guess functions.
+                        if guess_dict is not None:
+                            for gd_key, val in guess_dict.items():
+                                for attr, attr_val in val.items():
+                                    # e.g. setattr(guess_pars['frequency'], 'value', 20e6)
+                                    setattr(guess_pars[gd_key], attr, attr_val)
+                elif guess_dict is not None:
+                    if fitting_type == 'minimize':
+                        params = lmfit.Parameters()
+                        for gd_key, val in list(guess_dict.items()):
+                            params.add(gd_key)
+                            for attr, attr_val in val.items():
+                                setattr(params[gd_key], attr, attr_val)
+
+                    elif fitting_type == 'model':
+                        for gd_key, val in list(guess_dict.items()):
+                            model.set_param_hint(gd_key, **val)
+                        guess_pars = model.make_params()
+            else:
+                if fitting_type == 'minimize':
+                    raise NotImplementedError(
+                        'Conversion from guess_pars to params with lmfit.Parameters() needs to be implemented')
+                    # TODO: write a method that converts the type model.make_params() to a lmfit.Parameters() object
+            if fitting_type == 'model':  # Perform the fitting
+                fit_dict['fit_res'] = model.fit(**fit_xvals, **fit_yvals,
+                                                params=guess_pars)
+                self.fit_res[key] = fit_dict['fit_res']
+            elif fitting_type == 'minimize':  # Perform the fitting
+
+                fit_dict['fit_res'] = lmfit.minimize(fcn=_complex_residual_function,
+                                                     params=params,
+                                                     args=(fit_fn, fit_xvals, fit_yvals))
+                # save the initial params
+                fit_dict['fit_res'].initial_params = params
+                fit_dict['fit_res'].userkws = fit_xvals  # save the x values
+                fit_dict['fit_res'].fit_fn = fit_fn  # save the fit function
+                self.fit_res[key] = fit_dict['fit_res']
             
     def prepare_plots(self):
         for q in self.qubits:
@@ -800,12 +989,11 @@ def plot_Multi_flipping(qubit, data,title, ax=None, **kwargs):
     
     ax.plot(number_flips,nor_data,'-o')
     ax.plot(number_flips[:-4],fit_data_line,'-',label='line fit')
-    ax.plot(t,fit_data_cos,'-',label='cosine fit')
+    ax.plot(number_flips[:-4],fit_data_cos,'-',label='cosine fit')
     ax.legend()
     ax.set(ylabel=r'$F$ $|1 \rangle$')
     ax.set(xlabel= r'number of flips (#)')
     ax.set_title(title)
-    4444444
 
 class Multi_Motzoi_Analysis(ba.BaseDataAnalysis):
     def __init__(

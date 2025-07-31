@@ -1,21 +1,20 @@
 import copy
 import numpy as np
 import logging
-# import collections
-# from skopt import Optimizer
-# from adaptive.utils import cache_latest
-# from adaptive.notebook_integration import ensure_holoviews
-# from adaptive.learner.base_learner import BaseLearner
 
 log = logging.getLogger(__name__)
 
 
-def nelder_mead(fun, x0,
-                initial_step=0.1,
-                no_improve_thr=10e-6, no_improv_break=10,
-                maxiter=0,
-                alpha=1., gamma=2., rho=-0.5, sigma=0.5,
-                verbose=False):
+def nelder_mead(
+        fun, 
+        x0: np.ndarray,
+        initial_step=0.1,
+        no_improve_thr=10e-6, 
+        no_improve_break=10,
+        maxiter=0,
+        alpha=1., gamma=2., rho=-0.5, sigma=0.5,
+        verbose=False
+        ):
     '''
     parameters:
         fun (function): function to optimize, must return a scalar score
@@ -26,9 +25,9 @@ def nelder_mead(fun, x0,
             value for all parameters, if an array is specified it uses
             the specified step for each parameter.
 
-        no_improv_thr,  no_improv_break (float, int): break after
-            no_improv_break iterations with an improvement lower than
-            no_improv_thr
+        no_improve_thr, no_improve_break (float, int): 
+            break after no_improve_break iterations 
+            with an improvement lower than no_improve_thr
         maxiter (int): always break after this number of iterations.
             Set it to 0 to loop indefinitely.
         alpha (float): reflection coefficient
@@ -49,7 +48,7 @@ def nelder_mead(fun, x0,
     x0 = np.array(x0)  # ensures algorithm also accepts lists
     dim = len(x0)
     prev_best = fun(x0)
-    no_improv = 0
+    no_improve = 0
     res = [[x0, prev_best]]
     if type(initial_step) is float:
         initial_step_matrix = np.eye(dim)*initial_step
@@ -83,16 +82,16 @@ def nelder_mead(fun, x0,
         iters += 1
 
         if best < prev_best - no_improve_thr:
-            no_improv = 0
+            no_improve = 0
             prev_best = best
         else:
-            no_improv += 1
+            no_improve += 1
 
-        if no_improv >= no_improv_break:
+        if no_improve >= no_improve_break:
             # Conclude success, break the loop
             if verbose:
                 print('No improvement registered for {} rounds,'.format(
-                      no_improv_break) + 'concluding succesful convergence')
+                      no_improve_break) + 'concluding succesful convergence')
             break
 
         # centroid

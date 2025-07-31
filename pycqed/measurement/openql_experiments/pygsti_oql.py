@@ -3,12 +3,17 @@ This file reads in a pygsti dataset file and converts it to a valid
 OpenQL sequence.
 """
 import time
+import logging
 import numpy as np
 from os.path import join
+
+from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
 from pycqed.measurement.gate_set_tomography.pygsti_helpers import \
     pygsti_expList_from_dataset, gst_exp_filepath, split_expList
-import logging
+
+from openql import Kernel
+
 
 
 # used to map pygsti gates to openQL gates
@@ -21,41 +26,42 @@ gatemap = {'i': 'i',
            }
 
 
-def openql_program_from_pygsti_expList(expList, program_name: str,
-                                       qubits: list,
-                                       platf_cfg: str,
-                                       start_idx: int=0,
-                                       recompile=True):
+def _openql_program_from_pygsti_expList(
+        expList,
+        program_name: str,
+        qubits: list,
+        platf_cfg: str,
+        start_idx: int=0,
+        recompile=True
+) -> OqlProgram:
 
-    p = oqh.create_program(program_name, platf_cfg)
+    p = OqlProgram(program_name, platf_cfg)
 
     if oqh.check_recompilation_needed(p.filename, platf_cfg, recompile):
 
         for i, gatestring in enumerate(expList):
             kernel_name = 'G {} {}'.format(i, gatestring)
-            k = openql_kernel_from_gatestring(
+            k = _openql_kernel_from_gatestring(
                 gatestring=gatestring, qubits=qubits,
                 kernel_name=kernel_name, program=p)
             p.add_kernel(k)
-        p = oqh.compile(p)
+        p.compile()
 
     p.sweep_points = np.arange(len(expList), dtype=float) + start_idx
-    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
-    try:
-        p.set_sweep_points(p.sweep_points)
-    except TypeError:
-        # openql-0.5 compatibility
-        p.set_sweep_points(p.sweep_points, len(p.sweep_points))
 
     return p
 
 
-def openql_kernel_from_gatestring(gatestring, qubits: list,
-                                  kernel_name: str, program):
+def _openql_kernel_from_gatestring(
+        gatestring,
+        qubits: list,
+        kernel_name: str,
+        program
+) -> Kernel:
     """
     Generates an openQL kernel for a pygsti gatestring.
     """
-    k = oqh.create_kernel(kernel_name, program)
+    k = program.create_kernel(kernel_name)
     for q in qubits:
         k.prepz(q)
 
@@ -78,7 +84,7 @@ def openql_kernel_from_gatestring(gatestring, qubits: list,
     for q in qubits:
         k.measure(q)
     # ensures timing of readout is aligned
-    k.gate('wait', qubits, 0)
+    k.barrier(qubits)
 
     return k
 
@@ -87,11 +93,13 @@ def openql_kernel_from_gatestring(gatestring, qubits: list,
 # End of helper functions
 ##############################################################################
 
-def single_qubit_gst(q0: int, platf_cfg: str,
-                     maxL: int=256,
-                     lite_germs: bool = True,
-                     recompile=True,
-                     verbose: bool=True):
+def single_qubit_gst(
+        q0: int,
+        platf_cfg: str,
+        maxL: int = 256,
+        lite_germs: bool = True,
+        recompile=True,
+        verbose: bool = True):
     """
     Generates the QISA and QASM programs for full 2Q GST.
 
@@ -145,7 +153,7 @@ def single_qubit_gst(q0: int, platf_cfg: str,
         stop_idx = start_idx + len(expSubList)
 
         # turn into openql program
-        p = openql_program_from_pygsti_expList(
+        p = _openql_program_from_pygsti_expList(
             expSubList, 'std1Q_XYI q{} {} {} {}-{}'.format(
                 q0, lite_germs, maxL, start_idx, stop_idx),
             qubits=[q0],
@@ -164,11 +172,13 @@ def single_qubit_gst(q0: int, platf_cfg: str,
     return programs, exp_list_fn
 
 
-def two_qubit_gst(qubits: list, platf_cfg: str,
-                  maxL: int=256,
-                  lite_germs: bool = True,
-                  recompile=True,
-                  verbose: bool=True):
+def two_qubit_gst(
+        qubits: list,
+        platf_cfg: str,
+        maxL: int = 256,
+        lite_germs: bool = True,
+        recompile=True,
+        verbose: bool = True):
     """
     Generates the QISA and QASM programs for full 2Q GST.
 
@@ -223,7 +233,7 @@ def two_qubit_gst(qubits: list, platf_cfg: str,
         stop_idx = start_idx + len(expSubList)
 
         # turn into openql program
-        p = openql_program_from_pygsti_expList(
+        p = _openql_program_from_pygsti_expList(
             expSubList, 'std2Q_XYCPHASE q{}q{} {} {} {}-{}'.format(
                 qubits[0], qubits[1], lite_germs, maxL, start_idx, stop_idx),
             qubits=qubits,
@@ -242,7 +252,8 @@ def two_qubit_gst(qubits: list, platf_cfg: str,
     return programs, exp_list_fn
 
 
-def poor_mans_2q_gst(q0: int, q1: int, platf_cfg: str,):
+# FIXME: arguments replaced by hardcoded qubits
+def poor_mans_2q_gst(q0: int, q1: int, platf_cfg: str):
     """
     Generates the QISA and QASM programs for poor_mans_GST, this is 2Q GST
     without the repetitions of any gate.
@@ -250,6 +261,6 @@ def poor_mans_2q_gst(q0: int, q1: int, platf_cfg: str,):
     logging.warning("DEPRECATION WARNING poor_mans_2q_gst")
     fp = join(gst_exp_filepath, 'PoorMans_2Q_GST.txt')
     expList = pygsti_expList_from_dataset(fp)
-    p = openql_program_from_pygsti_expList(
+    p = _openql_program_from_pygsti_expList(
         expList, 'PoorMans_GST', [2, 0], platf_cfg=platf_cfg)
     return p

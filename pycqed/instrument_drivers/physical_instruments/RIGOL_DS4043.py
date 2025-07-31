@@ -503,7 +503,7 @@ class RIGOL_DS4043(VisaInstrument):
 
         status = self._visainstrument.read()
         while (reading and readTim<1):
-            if status is 'I':
+            if status == 'I':
                 self._visainstrument.write(':WAV:DATA?\n')
                 var = self._visainstrument.read()
                 buff.value = var

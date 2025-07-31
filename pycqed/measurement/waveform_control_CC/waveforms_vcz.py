@@ -153,6 +153,15 @@ def add_vcz_parameters(this_flux_lm, which_gate: str = None):
         unit="a.u.",
         label="Negative SNZ amplitude, if asymmetric is used.",
     )
+    this_flux_lm.add_parameter(
+        "vcz_num_B_points_%s" % which_gate,
+        docstring="Number of B points on the half NZ pulse",
+        parameter_class=ManualParameter,
+        vals=vals.Numbers(1, 5),
+        initial_value=1,
+        unit="a.u.",
+        label="Number of B points on the half NZ pulse",
+    )
 
     for specificity in ["coarse", "fine"]:
         this_flux_lm.add_parameter(
@@ -301,6 +310,9 @@ def vcz_waveform(
     norm_amp_sq = fluxlutman.get("vcz_amp_sq_{}".format(which_gate))
     norm_amp_fine = fluxlutman.get("vcz_amp_fine_{}".format(which_gate))
 
+    # number of B points on each half NZ square pulse
+    num_B_points = fluxlutman.get("vcz_num_B_points_{}".format(which_gate))
+
     # This is to avoid numerical issues when the user would run sweeps with
     # e.g. `time_at_swtspt = np.arange(0/2.4e9, 10/ 2.4e9, 2/2.4e9)`
     # instead of `time_at_swtspt = np.arange(0, 42, 2) / 2.4e9` and get
@@ -312,7 +324,7 @@ def vcz_waveform(
 
     pad_amps = np.full(int(time_pad / dt), 0)
     sq_amps = np.full(int(time_sqr / dt), norm_amp_sq)
-    amps_middle = np.full(int(time_middle / dt), amp_at_sweetspot)
+    amps_middle = np.full(int(time_middle / dt) - 2*(num_B_points - 1), amp_at_sweetspot)
 
     if use_asymmetric_NZ:
         # build asymmetric SNZ amplitudes
@@ -345,7 +357,7 @@ def vcz_waveform(
     else:
         if use_amp_fine:
             # such that this amp is in the range [0, 1]
-            slope_amp = np.array([norm_amp_fine * norm_amp_sq])
+            slope_amp = np.full(num_B_points, norm_amp_fine * norm_amp_sq)
         else:
             slope_amp = np.array([])
 

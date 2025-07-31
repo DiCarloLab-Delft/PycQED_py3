@@ -75,8 +75,8 @@ import inspect
 
 # Below: patch the QtPlot method to allow for setting a fixed color scale range
 
-import qcodes
-from qcodes.plots.pyqtgraph import QtPlot
+import qcodes_loop
+from qcodes_loop.plots.pyqtgraph import QtPlot
 
 
 def dummy_func(hist, **kwargs):
@@ -124,7 +124,7 @@ ast.fix_missing_locations(parsedQtPlotSource)
 # Compile and execute the code in the namespace of the "pyqtgraph" module
 # such that on next import of QtPlot the patched version will be used
 co = compile(parsedQtPlotSource, "<string>", "exec")
-exec(co, qcodes.plots.pyqtgraph.__dict__)
+exec(co, qcodes_loop.plots.pyqtgraph.__dict__)
 
 
 # Patch the color scales
@@ -141,15 +141,15 @@ parsed_colorscales = ast.parse(str_colorscales)
 parsed_colorscales_raw = ast.parse(str_colorscales_raw)
 
 co = compile(parsed_colorscales, "<string>", "exec")
-exec(co, qcodes.plots.colors.__dict__)
+exec(co, qcodes_loop.plots.colors.__dict__)
 co = compile(parsed_colorscales_raw, "<string>", "exec")
-exec(co, qcodes.plots.colors.__dict__)
+exec(co, qcodes_loop.plots.colors.__dict__)
 
 
 # On some systems this is also required probably because the colors get imported
 # there as well and, depending on the python version, the reference doesn't
 # change everywhere
 co = compile(parsed_colorscales, "<string>", "exec")
-exec(co, qcodes.plots.pyqtgraph.__dict__)
+exec(co, qcodes_loop.plots.pyqtgraph.__dict__)
 co = compile(parsed_colorscales_raw, "<string>", "exec")
-exec(co, qcodes.plots.pyqtgraph.__dict__)
+exec(co, qcodes_loop.plots.pyqtgraph.__dict__)

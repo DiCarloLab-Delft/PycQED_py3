@@ -3,16 +3,17 @@
 from pycqed.version import __version__
 import sys
 
-module_name = "qcodes"
-if module_name in sys.modules:
-    # This is needed so that the `qcodes_QtPlot_monkey_patching` works for any
-    # subsequent `qcodes` import
-    raise ImportError("`pycqed` must be imported before `qcodes`! See "
-        "__init__.py in `pycqed` folder for more information.\n"
-        "NB: Any `qcodes` submodule must also be imported after pycqed.")
-# We need to import this here so that any later imports of `QtPlot` from qcodes
-# KEEP ABOVE any QtPlot import!!!
-from pycqed.measurement import qcodes_QtPlot_monkey_patching
+if 1:   # FIXME: hack should be removed
+    module_name = "qcodes"
+    if module_name in sys.modules:
+        # This is needed so that the `qcodes_QtPlot_monkey_patching` works for any
+        # subsequent `qcodes` import
+        raise ImportError("`pycqed` must be imported before `qcodes`! See "
+            "__init__.py in `pycqed` folder for more information.\n"
+            "NB: Any `qcodes` submodule must also be imported after pycqed.")
+    # We need to import this here so that any later imports of `QtPlot` from qcodes
+    # KEEP ABOVE any QtPlot import!!!
+    from pycqed.measurement import qcodes_QtPlot_monkey_patching
 
 # from pycqed import measurement
 # from pycqed import analysis

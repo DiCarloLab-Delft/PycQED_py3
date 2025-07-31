@@ -8,7 +8,7 @@ from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 from pycqed.measurement.waveform_control_CC import waveforms_vcz as wf_vcz
 
 import PyQt5
-from qcodes.plots.pyqtgraph import QtPlot
+from qcodes_loop.plots.pyqtgraph import QtPlot
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 import time
@@ -256,6 +256,14 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 # initial value is chosen to not raise errors
                 initial_value=6e9,
                 unit="Hz",
+                parameter_class=ManualParameter,
+            )
+            self.add_parameter(
+                "q_amp_center_%s" % this_cz,
+                docstring="center amplitude for cz sweeps",
+                unit="a.u.",
+                vals=vals.Numbers(0, 1),
+                initial_value=0,
                 parameter_class=ManualParameter,
             )
             self.add_parameter(
@@ -1277,4 +1285,7 @@ class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
 
 
 def roundup1024(n):
-    return int(np.ceil(n / 96) * 96)
+    #return int(np.ceil(n / 96) * 96)
+    #LDC changing this 2022/07:
+    #Enforcing an integer number of QuSurf heartbeats, rather than an even integer.
+    return int(np.ceil(n / 48) * 48)

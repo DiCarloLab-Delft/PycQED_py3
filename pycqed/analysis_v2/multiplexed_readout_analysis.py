@@ -3,6 +3,7 @@ import matplotlib.pylab as pl
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from matplotlib.colors import LinearSegmentedColormap
+import matplotlib.patches as patches
 import numpy as np
 from collections import OrderedDict
 import pycqed.analysis_v2.base_analysis as ba
@@ -15,7 +16,7 @@ from pycqed.utilities.general import int2base
 import pycqed.measurement.hdf5_data as h5d
 import copy
 import lmfit
-from scipy.optimize import minimize
+from scipy.optimize import minimize, curve_fit
 from pycqed.analysis.fitting_models import ro_gauss, ro_CDF, ro_CDF_discr,\
      gaussian_2D, gauss_2D_guess, gaussianCDF, ro_double_gauss_guess, \
      ExpDecayFunc, exp_dec_guess
@@ -37,10 +38,10 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
 
     def __init__(self,
                 nr_qubits: int,
-                t_start: str = None, 
+                t_start: str = None,
                 t_stop: str = None,
                 label: str = '',
-                options_dict: dict = None, 
+                options_dict: dict = None,
                 extract_only: bool = False,
                 extract_combinations: bool = False,
                 post_selection: bool = False,
@@ -92,13 +93,13 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             self.Channels = self.raw_data_dict['value_names']
             Channels = self.Channels
             raw_shots = self.raw_data_dict['data'][:, 1:]
-            qubit_labels = [ch.decode('utf-8').rsplit(' ', 1)[1] for ch in Channels]
+            qubit_labels = [ch.rsplit(' ', 1)[1] for ch in Channels]
         # Data in two quadratures
         elif len(self.raw_data_dict['value_names']) == 2*nr_qubits:
             self.Channels = self.raw_data_dict['value_names'][::2]
             Channels = self.Channels
             raw_shots = self.raw_data_dict['data'][:, 1::2]
-            qubit_labels = [ch.decode('utf-8').rsplit(' ', 2)[1] for ch in Channels]
+            qubit_labels = [ch.rsplit(' ', 2)[1] for ch in Channels]
         else:
             raise ValueError('Number of qudratures is not the same for all qubits')
 
@@ -238,7 +239,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 F_vs_th = (1-(1-abs(norm_cumsum_0-norm_cumsum_1))/2)
                 opt_idxs = np.argwhere(F_vs_th == np.amax(F_vs_th))
                 opt_idx = int(round(np.average(opt_idxs)))
-                #opt_idx = np.argmin(np.abs(all_bins-self.post_selec_thresholds[i])) 
+                #opt_idx = np.argmin(np.abs(all_bins-self.post_selec_thresholds[i]))
                 self.proc_data_dict['Post_PDF_data'][ch]['F_assignment_raw'] = \
                     F_vs_th[opt_idx]
                 self.proc_data_dict['Post_PDF_data'][ch]['threshold_raw'] = \
@@ -987,7 +988,12 @@ class Multiplexed_Transient_Analysis(ba.BaseDataAnalysis):
 
     def process_data(self):
 
-        length = int(len(self.raw_data_dict['data'][:, 0])/2)
+        # Leo DC change. 
+        # Why is the weight function half the length?
+        #length = int(len(self.raw_data_dict['data'][:, 0])/2)
+        length = int(len(self.raw_data_dict['data'][:, 0]))
+
+
         self.proc_data_dict['Time_data'] = np.arange(length)/1.8e9
         self.proc_data_dict['Channel_0_data'] = self.raw_data_dict['data'][:, 1][:length]
         self.proc_data_dict['Channel_1_data'] = self.raw_data_dict['data'][:, 2][:length]
@@ -1027,7 +1033,8 @@ class Multiplexed_Weights_Analysis(ba.BaseDataAnalysis):
                  A_ground, A_excited,
                  t_start: str = None, t_stop: str = None,
                  label: str = '',
-                 options_dict: dict = None, extract_only: bool = False,
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
                  auto=True):
 
         super().__init__(t_start=t_start, t_stop=t_stop,
@@ -1068,9 +1075,19 @@ class Multiplexed_Weights_Analysis(ba.BaseDataAnalysis):
         W_I = I_e - I_g
         W_Q = Q_e - Q_g
 
+        # remove average
+        W_I-=np.average(W_I)
+        W_Q-=np.average(W_Q)
+
         #normalize weights
-        W_I = W_I/np.max(W_I)
-        W_Q = W_Q/np.max(W_Q)
+        maxabsW_I=np.max([np.abs(np.max(W_I)), np.abs(np.min(W_I))])
+        maxabsW_Q=np.max([np.abs(np.max(W_Q)), np.abs(np.min(W_Q))])
+        maxabs=np.max([maxabsW_I, maxabsW_Q])
+        W_I = W_I/maxabs
+        W_Q = W_Q/maxabs
+
+        #W_I = W_I/np.max(W_I)
+        #W_Q = W_Q/np.max(W_Q)
 
         C = W_I + 1j*W_Q
 
@@ -1731,6 +1748,407 @@ class RTE_analysis(ba.BaseDataAnalysis):
                 close_figs=self.options_dict.get('close_figs', True),
                 tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
+###### RDC changed on 02-02-2023 (commented the previous code and add the new one) ##########
+
+class measurement_QND_analysis(ba.BaseDataAnalysis):
+    """
+    This analysis extracts measurement QND metrics 
+    For details on the procedure see:
+    arXiv:2110.04285
+    """
+    def __init__(self,
+                 qubit:str,
+                 f_state: bool = False,
+                 t_start: str = None, 
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+
+        self.qubit = qubit
+        self.f_state = f_state
+
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+            data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        if self.f_state:
+            _cycle = 6
+        else:
+            _cycle = 5
+        # Calibration shots
+        I0, Q0 = self.raw_data_dict['data'][:,1][3::_cycle], self.raw_data_dict['data'][:,2][3::_cycle]
+        I1, Q1 = self.raw_data_dict['data'][:,1][4::_cycle], self.raw_data_dict['data'][:,2][4::_cycle]
+        if self.f_state:
+            I2, Q2 = self.raw_data_dict['data'][:,1][5::_cycle], self.raw_data_dict['data'][:,2][5::_cycle]
+            center_2 = np.array([np.mean(I2), np.mean(Q2)])
+        # Measurement
+        IM1, QM1 = self.raw_data_dict['data'][0::_cycle,1], self.raw_data_dict['data'][0::_cycle,2]
+        IM2, QM2 = self.raw_data_dict['data'][1::_cycle,1], self.raw_data_dict['data'][1::_cycle,2]
+        IM3, QM3 = self.raw_data_dict['data'][2::_cycle,1], self.raw_data_dict['data'][2::_cycle,2]
+        # Rotate data
+        center_0 = np.array([np.mean(I0), np.mean(Q0)])
+        center_1 = np.array([np.mean(I1), np.mean(Q1)])
+        def rotate_and_center_data(I, Q, vec0, vec1):
+            vector = vec1-vec0
+            angle = np.arctan(vector[1]/vector[0])
+            rot_matrix = np.array([[ np.cos(-angle),-np.sin(-angle)],
+                                   [ np.sin(-angle), np.cos(-angle)]])
+            # Subtract mean
+            proc = np.array((I-(vec0+vec1)[0]/2, Q-(vec0+vec1)[1]/2))
+            # Rotate theta
+            proc = np.dot(rot_matrix, proc)
+            return proc
+        I0_proc, Q0_proc = rotate_and_center_data(I0, Q0, center_0, center_1)
+        I1_proc, Q1_proc = rotate_and_center_data(I1, Q1, center_0, center_1)
+        IM1_proc, QM1_proc = rotate_and_center_data(IM1, QM1, center_0, center_1)
+        IM2_proc, QM2_proc = rotate_and_center_data(IM2, QM2, center_0, center_1)
+        IM3_proc, QM3_proc = rotate_and_center_data(IM3, QM3, center_0, center_1)
+        if np.mean(I0_proc) > np.mean(I1_proc):
+            I0_proc *= -1
+            I1_proc *= -1
+            IM1_proc *= -1
+            IM2_proc *= -1
+            IM3_proc *= -1
+        # Calculate optimal threshold
+        ubins_A_0, ucounts_A_0 = np.unique(I0_proc, return_counts=True)
+        ubins_A_1, ucounts_A_1 = np.unique(I1_proc, return_counts=True)
+        ucumsum_A_0 = np.cumsum(ucounts_A_0)
+        ucumsum_A_1 = np.cumsum(ucounts_A_1)
+        # merge |0> and |1> shot bins
+        all_bins_A = np.unique(np.sort(np.concatenate((ubins_A_0, ubins_A_1))))
+        # interpolate cumsum for all bins
+        int_cumsum_A_0 = np.interp(x=all_bins_A, xp=ubins_A_0, fp=ucumsum_A_0, left=0)
+        int_cumsum_A_1 = np.interp(x=all_bins_A, xp=ubins_A_1, fp=ucumsum_A_1, left=0)
+        norm_cumsum_A_0 = int_cumsum_A_0/np.max(int_cumsum_A_0)
+        norm_cumsum_A_1 = int_cumsum_A_1/np.max(int_cumsum_A_1)
+        # Calculating threshold
+        F_vs_th = (1-(1-abs(norm_cumsum_A_0-norm_cumsum_A_1))/2)
+        opt_idxs = np.argwhere(F_vs_th == np.amax(F_vs_th))
+        opt_idx = int(round(np.average(opt_idxs)))
+        threshold = all_bins_A[opt_idx]
+        # digitize data
+        P0_dig = np.array([ 0 if s<threshold else 1 for s in I0_proc ])
+        P1_dig = np.array([ 0 if s<threshold else 1 for s in I1_proc ])
+        M1_dig = np.array([ 0 if s<threshold else 1 for s in IM1_proc ])
+        M2_dig = np.array([ 0 if s<threshold else 1 for s in IM2_proc ])
+        M3_dig = np.array([ 0 if s<threshold else 1 for s in IM3_proc ])
+        # Calculate qoi
+        Fidelity = (np.mean(1-P0_dig) + np.mean(P1_dig))/2
+        p0 = 1-np.mean(M1_dig)
+        p1 = np.mean(M1_dig)
+        p00 = np.mean(1-np.logical_or(M1_dig, M2_dig))/p0
+        p11 = np.mean(np.logical_and(M1_dig, M2_dig))/p1
+        P_QND = np.mean([p00, p11])
+        p0p = 1-np.mean(M2_dig)
+        p1p = np.mean(M2_dig)
+        p01p = np.mean(1-np.logical_or(np.logical_not(M3_dig), M2_dig))/p0p
+        p10p = np.mean(1-np.logical_or(np.logical_not(M2_dig), M3_dig))/p1p
+        P_QNDp = np.mean([p01p, p10p])
+
+        self.proc_data_dict['I0'], self.proc_data_dict['Q0'] = I0, Q0
+        self.proc_data_dict['I1'], self.proc_data_dict['Q1'] = I1, Q1
+        if self.f_state:
+            self.proc_data_dict['I2'], self.proc_data_dict['Q2'] = I2, Q2
+            self.proc_data_dict['center_2'] = center_2
+        self.proc_data_dict['I0_proc'], self.proc_data_dict['Q0_proc'] = I0_proc, Q0_proc
+        self.proc_data_dict['I1_proc'], self.proc_data_dict['Q1_proc'] = I1_proc, Q1_proc
+        self.proc_data_dict['center_0'] = center_0
+        self.proc_data_dict['center_1'] = center_1
+        self.proc_data_dict['threshold'] = threshold
+        self.qoi = {}
+        self.qoi['p00'] = p00
+        self.qoi['p11'] = p11
+        self.qoi['p01p'] = p01p
+        self.qoi['p10p'] = p10p
+        self.qoi['Fidelity'] = Fidelity
+        self.qoi['P_QND'] = P_QND
+        self.qoi['P_QNDp'] = P_QNDp
+
+    def prepare_plots(self):
+
+        self.axs_dict = {}
+        fig, axs = plt.subplots(figsize=(4,2), ncols=2, dpi=200)
+        # fig.patch.set_alpha(0)
+        self.axs_dict['main'] = axs[0]
+        self.figs['main'] = fig
+        self.plot_dicts['main'] = {
+            'plotfn': plot_QND_metrics,
+            'ax_id': 'main',
+            'I0': self.proc_data_dict['I0'],
+            'Q0': self.proc_data_dict['Q0'],
+            'I1': self.proc_data_dict['I1'],
+            'Q1': self.proc_data_dict['Q1'],
+            'I2': self.proc_data_dict['I2'] if self.f_state else None,
+            'Q2': self.proc_data_dict['Q2'] if self.f_state else None,
+            'center_0': self.proc_data_dict['center_0'],
+            'center_1': self.proc_data_dict['center_1'],
+            'center_2': self.proc_data_dict['center_2'] if self.f_state else None,
+            'I0_proc': self.proc_data_dict['I0_proc'],
+            'I1_proc': self.proc_data_dict['I1_proc'],
+            'threshold': self.proc_data_dict['threshold'],
+            'p00': self.qoi['p00'],
+            'p11': self.qoi['p11'],
+            'p01p': self.qoi['p01p'],
+            'p10p': self.qoi['p10p'],
+            'P_QND': self.qoi['P_QND'],
+            'P_QNDp': self.qoi['P_QNDp'],
+            'Fidelity': self.qoi['Fidelity'],
+            'qubit': self.qubit,
+            'timestamp': self.timestamp
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+
+class measurement_dephasing_analysis(ba.BaseDataAnalysis):
+    """
+    """
+    def __init__(self,
+                 meas_time: float,
+                 exception_qubits: list,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None,
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+
+        self.meas_time = meas_time
+        self.exception_qubits = exception_qubits
+
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+            data_fp, param_spec)
+
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+
+        Qubits = [ name.decode().split(' ')[-1] for name in self.raw_data_dict['value_names'] ]
+        self.Qubits = Qubits
+        data = self.raw_data_dict['data']
+        # Sort measured data
+        angles = data[0:-4:6,0]
+        M_data = {}
+        for i, q in enumerate(Qubits):
+            cal_0 = np.mean(data[-4:-2,i+1])
+            cal_1 = np.mean(data[-2:,i+1])
+            if q not in self.exception_qubits:
+                M_data[q] = {'no_meas_0': (data[0:-4:6,i+1]-cal_0)/(cal_1-cal_0),
+                             'no_meas_1': (data[1:-4:6,i+1]-cal_0)/(cal_1-cal_0),
+                             'meas_0' : (data[3:-4:6,i+1]-cal_0)/(cal_1-cal_0),
+                             'meas_1' : (data[5:-4:6,i+1]-cal_0)/(cal_1-cal_0),
+                             'cal_pts' : (data[-4:,i+1]-cal_0)/(cal_1-cal_0)}
+            else:
+                M_data[q] = {'no_meas_0': (data[0:-4:6,i+1]-cal_0)/(cal_1-cal_0),
+                             'no_meas_1': (data[1:-4:6,i+1]-cal_0)/(cal_1-cal_0),
+                             'meas_0' : (data[2:-4:6,i+1]-cal_0)/(cal_1-cal_0),
+                             'meas_1' : (data[4:-4:6,i+1]-cal_0)/(cal_1-cal_0),
+                             'cal_pts' : (data[-4:,i+1]-cal_0)/(cal_1-cal_0)}
+        # Fit measured data
+        def func(x, A, phi, offset):
+            return A*np.cos((x+phi)*np.pi/180) + offset
+        Fit_params = {}
+        Dephasing = {q : {} for q in Qubits}
+        for q in Qubits:
+            Fit_params[q] = {}
+            for key in list(M_data[q].keys())[:-1]:
+                popt, pcov = curve_fit(func, angles, M_data[q][key])
+                Fit_params[q][key] = popt
+            Dephasing[q]['0'] = np.log(abs(Fit_params[q]["no_meas_0"][0])/abs(Fit_params[q]["meas_0"][0]))/self.meas_time
+            Dephasing[q]['1'] = np.log(abs(Fit_params[q]["no_meas_1"][0])/abs(Fit_params[q]["meas_1"][0]))/self.meas_time
+
+        self.proc_data_dict = {}
+        self.proc_data_dict['Measured_data'] = M_data
+        self.proc_data_dict['Fit_params'] = Fit_params
+        self.qoi = {'Dephasing_0': {q:Dephasing[q]['0'] for q in Qubits },
+                    'Dephasing_1': {q:Dephasing[q]['1'] for q in Qubits }}
+
+
+    def prepare_plots(self):
+        for q in self.Qubits[1:]:
+            self.plot_dicts[f'Ramsey_curves_{q}'] = {
+                'plotfn': plot_ramsey_dephasing,
+                'qubit': q,
+                'M_data': self.proc_data_dict['Measured_data'],
+                'Fit_params': self.proc_data_dict['Fit_params'],
+                'timestamp': self.timestamp,
+                'Dephasing_0':self.qoi['Dephasing_0'][q],
+                'Dephasing_1':self.qoi['Dephasing_1'][q]
+            }
+
+class Depletion_AllXY_analysis(ba.BaseDataAnalysis):
+    """
+    """
+    def __init__(self,
+                 qubit,
+                 t_start: str = None, 
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.qubit = qubit
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+            data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        _cycle = 6
+        data_0 = self.raw_data_dict['data'][:,1][0::_cycle]
+        data_1 = self.raw_data_dict['data'][:,1][2::_cycle]
+        data_2 = self.raw_data_dict['data'][:,1][3::_cycle]
+        data_3 = self.raw_data_dict['data'][:,1][5::_cycle]
+        zero_lvl = np.mean(data_0[:2])
+        one_lvl = np.mean(data_0[-2:])
+        data_0 = (data_0 - zero_lvl)/(one_lvl-zero_lvl)
+        data_1 = (data_1 - zero_lvl)/(one_lvl-zero_lvl)
+        data_2 = (data_2 - zero_lvl)/(one_lvl-zero_lvl)
+        data_3 = (data_3 - zero_lvl)/(one_lvl-zero_lvl)
+        self.proc_data_dict['data_0'] = data_0
+        self.proc_data_dict['data_1'] = data_1
+        self.proc_data_dict['data_2'] = data_2
+        self.proc_data_dict['data_3'] = data_3
+        
+    def prepare_plots(self):
+        self.axs_dict = {}
+        fig, axs = plt.subplots(figsize=(12,4), ncols=2)
+        axs = axs.flatten()
+        self.figs['main'] = fig
+        self.axs_dict['main'] = axs[0]
+        self.plot_dicts['main'] = {
+            'plotfn': plot_depletion_allxy,
+            'ax_id': 'main',
+            'data_0': self.proc_data_dict['data_0'],
+            'data_1': self.proc_data_dict['data_1'],
+            'data_2': self.proc_data_dict['data_2'],
+            'data_3': self.proc_data_dict['data_3'],
+            'qubit': self.qubit,
+            'timestamp': self.timestamp
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+def plot_depletion_allxy(qubit, timestamp,
+                         data_0, data_1,
+                         data_2, data_3,
+                         ax, **kw):
+    fig = ax.get_figure()
+    axs = fig.get_axes()
+
+    allXY = ['II', 'XX', 'YY', 'XY', 'YX', 'xI', 'yI',
+             'xy', 'yx', 'xY', 'yX', 'Xy', 'Yx', 'xX',
+             'Xx', 'yY', 'Yy', 'XI', 'YI', 'xx', 'yy']
+
+    ideal = [0 for i in range(10)] + [.5 for i in range(24)] + [1 for i in range(8)]
+
+    axs[0].set_xticks(np.arange(0, 42, 2)+.5)
+    axs[0].set_xticklabels(allXY)
+    axs[0].set_ylabel(r'P($|1\rangle$)')
+    axs[0].plot(ideal, 'k--', lw=1, label='ideal')
+    axs[0].plot(data_0, 'C0o-', alpha=1, label='Standard sequence')
+    axs[0].plot(data_1, 'C1.-', alpha=.75, label='post-measurement')
+    axs[0].legend(loc=0)
+    axs[0].set_title(r'Qubit initialized in $|0\rangle$')
+
+    axs[1].set_xticks(np.arange(0, 42, 2)+.5)
+    axs[1].set_xticklabels(allXY)
+    axs[1].set_ylabel(r'P($|1\rangle$)')
+    axs[1].plot(1-np.array(ideal), 'k--', lw=1, label='ideal')
+    axs[1].plot(data_2, 'C0o-', alpha=1, label='Standard sequence')
+    axs[1].plot(data_3, 'C1.-', alpha=.75, label='post-measurement')
+    axs[1].legend(loc=0)
+    axs[1].set_title(r'Qubit initialized in $|1\rangle$')
+
+    fig.suptitle(timestamp+'\nDepletion_ALLXY_'+qubit, y=1.0)
+
+######################################
+# Helper functions
+######################################
+
+def estimate_threshold(P0, P1):
+    bounds = np.min(list(P0)+list(P1)), np.max(list(P0)+list(P1))
+    y0, x0 = np.histogram(P0, range=bounds, bins=200)
+    x0 = (x0[1:]+x0[:-1])/2
+    y1, x1 = np.histogram(P1, range=bounds, bins=200)
+    x1 = (x1[1:]+x1[:-1])/2
+    bounds = np.argmax(y0), np.argmax(y1)
+    intersect0 = y0[bounds[0]:bounds[1]]
+    intersect1 = y1[bounds[0]:bounds[1]]
+    th_idx = np.argmin(np.abs(intersect0-intersect1))
+    th = x0[bounds[0]:bounds[1]][th_idx]
+    return th
 
 ######################################
 # Plotting functions
@@ -2077,7 +2495,7 @@ def plot_single_qubit_crosstalk(data, ax, para_hist,
         ax.plot(bin_centers, cnts, label=key, color=col)
     ax.axvline(x=threshold, label=r'$\mathrm{threshold}_{assign}$',
                ls='--', linewidth=1., color='black', alpha=.75)
-    ax.set_xlabel(mpl_utils.latex_friendly_str(value_name.decode('utf-8')))
+    ax.set_xlabel(mpl_utils.latex_friendly_str(value_name))
     ax.set_ylabel('Counts')
     # l = ax.legend(loc=(1.05, .01), title='Prepared state\n{}'.format(
     #     qubit_labels), prop={'size': 4})
@@ -2342,3 +2760,159 @@ def plot_RTE_histogram(qubit_label: str,
     fig = ax.get_figure()
     fig.suptitle(mpl_utils.latex_friendly_str('{}'.format(timestamp)), y=1.05)
     fig.tight_layout()
+
+
+def plot_QND_metrics(I0, Q0,
+                     I1, Q1,
+                     I2, Q2,
+                     center_0,
+                     center_1,
+                     center_2,
+                     I0_proc,
+                     I1_proc,
+                     threshold,
+                     p00, p11,
+                     p01p, p10p,
+                     P_QND, P_QNDp,
+                     Fidelity,
+                     timestamp,
+                     qubit,
+                     ax, **kw):
+    fig = ax.get_figure()
+    axs = fig.get_axes()
+    # plot raw shots on IQ plane
+    axs[0].plot(I0, Q0, 'C0.', alpha=.05, markersize=1)
+    axs[0].plot(I1, Q1, 'C3.', alpha=.05, markersize=1)
+    if type(I2) != type(None):
+        axs[0].plot(I2, Q2, 'C2.', alpha=.05, markersize=1)
+    axs[0].plot([0, center_0[0]], [0, center_0[1]], ls='--', lw=.75, color='k', alpha=1)
+    axs[0].plot([0, center_1[0]], [0, center_1[1]], ls='--', lw=.75, color='k', alpha=1)
+    axs[0].plot(center_0[0], center_0[1], marker='x', color='k', markersize=3)
+    axs[0].plot(center_1[0], center_1[1], marker='x', color='k', markersize=3)
+    if type(center_2) != type(None):
+        axs[0].plot([0, center_2[0]], [0, center_2[1]], ls='--', lw=.75, color='k', alpha=1)
+        axs[0].plot(center_2[0], center_2[1], marker='x', color='k', markersize=3)
+    # plot threshold
+    x = np.arange(-10, 10)
+    vector = center_1-center_0
+    angle = np.arctan(vector[1]/vector[0])
+    axs[0].plot(x+(center_0+center_1)[0]/2, np.tan(angle+np.pi/2)*x+(center_0+center_1)[1]/2, 
+                ls='--', lw=.5, color='k')
+    # plot histogram of rotated shots
+    rang = np.max(list(np.abs(I0_proc))+list(np.abs(I1_proc)))
+    axs[1].hist(I0_proc, range=[-rang, rang], bins=100, color='C0', alpha=.75, label='ground')
+    axs[1].hist(I1_proc, range=[-rang, rang], bins=100, color='C3', alpha=.75, label='excited')
+    axs[1].axvline(threshold, ls='--', lw=.5, color='k', label='threshold')
+    axs[1].legend(loc='upper right', fontsize=3, frameon=False)
+    
+    rang = np.max(list(np.abs(I0))+list(np.abs(I1))+
+                  list(np.abs(Q0))+list(np.abs(Q1)))
+    axs[0].set_xlim(-1.15*rang,1.15*rang)
+    axs[0].set_ylim(-1.15*rang,1.15*rang)
+    axs[0].set_title('Raw calibration shots', fontsize=9)
+    axs[0].set_ylabel('Q quadrature (mV)', size=8)
+    axs[0].set_xlabel('I quadrature (mV)', size=8)
+    axs[1].set_yticks([])
+    axs[1].set_title('Rotated data', fontsize=9)
+    axs[1].set_xlabel('Integrated voltage (mV)', size=8)
+    # Write results
+    text = '\n'.join((f'P$(0_2|0_1)$  = {p00*100:.2f} %',
+                      f'P$(1_2|1_1)$  = {p11*100:.2f} %',
+                      f'P$(1_3|0_2)$  = {p01p*100:.2f} %',
+                      f'P$(0_3|1_2)$  = {p10p*100:.2f} %',
+                      '',
+                      f'Fidelity$= {Fidelity*100:.2f}$ %',
+                      '$P_{QND}$ = '+f'{P_QND*100:.2f} %',
+                      '$P_{QND,X_\pi}$ = '+f'{P_QNDp*100:.2f} %'))
+    props = dict(boxstyle='round', facecolor='gray', alpha=0.15)
+    axs[1].text(1.05, 1, 'Experiment', transform=axs[1].transAxes, fontsize=6,
+            verticalalignment='top')
+    axs[1].text(1.05, .975-.225, 'Results', transform=axs[1].transAxes, fontsize=6,
+            verticalalignment='top')
+    axs[1].text(1.05, 0.9-.225, text, transform=axs[1].transAxes, fontsize=6,
+            verticalalignment='top', bbox=props)
+    # Plot experiment
+    ax1 = fig.add_subplot(212)
+    ax1.set_position((.9, .7 , .225, .15))
+    ax1.set_xlim(0,  1*1.12)
+    ax1.set_ylim(0, .4*1.12)
+    ax1.axis('off')
+    ax1.plot([.1, 2.01], [.2, .2], 'k', lw=.5)
+    rect = patches.Rectangle((.05, .125), .15, .15, linewidth=.25, edgecolor='k', facecolor='white', zorder=3)
+    ax1.add_patch(rect)
+    ax1.text(.125, .185, '$X_{\pi/2}$', va='center', ha='center', size=4)
+    rect = patches.Rectangle((.22, .125), .22, .15, linewidth=.25, edgecolor='k', facecolor='white', zorder=3)
+    ax1.add_patch(rect)
+    ax1.text(.33, .185, '$m_1$', va='center', ha='center', size=4)
+    rect = patches.Rectangle((.47, .125), .22, .15, linewidth=.25, edgecolor='k', facecolor='white', zorder=3)
+    ax1.add_patch(rect)
+    ax1.text(.58, .185, '$m_2$', va='center', ha='center', size=4)
+    rect = patches.Rectangle((.72, .125), .15, .15, linewidth=.25, edgecolor='k', facecolor='white', zorder=3)
+    ax1.add_patch(rect)
+    ax1.text(.8, .185, '$X_{\pi}$', va='center', ha='center', size=4)
+    rect = patches.Rectangle((.89, .125), .22, .15, linewidth=.25, edgecolor='k', facecolor='white', zorder=3)
+    ax1.add_patch(rect)
+    ax1.text(1, .185, '$m_3$', va='center', ha='center', size=4)
+    fig.suptitle(f'Qubit {qubit}\n{timestamp}', y=1.1, size=9)
+
+
+def plot_ramsey_dephasing(qubit, timestamp,
+                          M_data, Fit_params,
+                          Dephasing_0, Dephasing_1,
+                          ax, **kw):
+    angles = np.arange(0,360,20)
+    ax.plot(angles, M_data[qubit]['no_meas_0'], 'C0o', label='no_meas_0')
+    ax.plot(angles, M_data[qubit]['no_meas_1'], 'C3o', label='no_meas_1')
+    ax.plot(angles, M_data[qubit]['meas_0'], 'o',
+            color='teal', label='meas_0')
+    ax.plot(angles, M_data[qubit]['meas_1'], 'o',
+            color='palevioletred', label='meas_1')
+    ax.plot([360, 370, 380, 390], M_data[qubit]['cal_pts'], 'C2o-')
+
+    def func(x, A, phi, offset):
+            return A*np.cos((x+phi)*np.pi/180) + offset
+    X = np.linspace(0, 340, 101)
+    ax.plot(X, func(X, *Fit_params[qubit]['no_meas_0']), 'C0--')
+    ax.plot(X, func(X, *Fit_params[qubit]['no_meas_1']), 'C3--')
+    ax.plot(X, func(X, *Fit_params[qubit]['meas_0']), '--', color='teal')
+    ax.plot(X, func(X, *Fit_params[qubit]['meas_1']), '--', color='palevioletred')
+
+    ax.set_title(f'{timestamp} Target qubit {qubit}')
+    ax.set_xlabel('Angle (deg)')
+    ax.set_ylabel(r'P($|1\rangle$)')
+
+    text = 'Without RO pulse: \n'+\
+           f'$\phi_0={Fit_params[qubit]["no_meas_0"][1]:.2f}$\n'+\
+           f'$\phi_1={Fit_params[qubit]["no_meas_1"][1]:.2f}$\n'+\
+           '\nWith RO pulse: \n'+\
+           f'$\phi_0={Fit_params[qubit]["meas_0"][1]:.2f}$\n'+\
+           f'$\phi_1={Fit_params[qubit]["meas_1"][1]:.2f}$\n'+\
+           '\nDephasing: \n'+\
+           f'$\Gamma_0={Dephasing_0*1e-3:.2f}$ KHz\n'+\
+           f'$\Gamma_1={Dephasing_1*1e-3:.2f}$ KHz'
+    props = dict(boxstyle='round', facecolor='white')
+    ax.text(430, .3, text, bbox=props)
+
+    ax.legend(frameon=False)
+
+
+# RDC #
+# This works only when the qubit is initialized in 0
+# def plot_depletion_allxy(qubit, timestamp,
+#                          data_0, data_1,
+#                          ax, **kw):
+
+#     allXY = ['II', 'XX', 'YY', 'XY', 'YX', 'xI', 'yI',
+#              'xy', 'yx', 'xY', 'yX', 'Xy', 'Yx', 'xX',
+#              'Xx', 'yY', 'Yy', 'XI', 'YI', 'xx', 'yy']
+
+#     ideal = [0 for i in range(10)] + [.5 for i in range(24)] + [1 for i in range(8)]
+
+#     ax.set_xticks(np.arange(0, 42, 2)+.5)
+#     ax.set_xticklabels(allXY)
+#     ax.set_ylabel(r'P($|1\rangle$)')
+#     ax.plot(ideal, 'k--', lw=1, label='ideal')
+#     ax.plot(data_0, 'C0o-', alpha=1, label='Standard sequence')
+#     ax.plot(data_1, 'C1.-', alpha=.75, label='post-measurement')
+#     ax.set_title(timestamp+'_Depletion_ALLXY_'+qubit)
+#     ax.legend(loc=0)

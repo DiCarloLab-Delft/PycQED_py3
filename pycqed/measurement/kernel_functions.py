@@ -148,12 +148,12 @@ def step_scope(t=None, params=None):
     if t is None:
         t_index = np.array(range(max_len_output))
     elif np.double(t).shape == ():
-        t_index_end = np.int(np.min(
-            [params['step_first_point']+t*np.float(params['points_per_ns']), max_len_output]))
+        t_index_end = int(np.min(
+            [params['step_first_point']+t*float(params['points_per_ns']), max_len_output]))
         t_index = np.array(range(0, t_index_end, params['points_per_ns']))
     else:
         t_scope = list((np.arange(
-            max_len_output)-params['step_first_point'])/np.float(params['points_per_ns']))
+            max_len_output)-params['step_first_point'])/float(params['points_per_ns']))
 #         t = t*(t>=-1)
         t_index = np.array([t_scope.index(tt)
                             for tt in t if (t_scope.index(tt) < max_len_output)])
@@ -372,7 +372,7 @@ def get_all_sampled_vector(vector, step_width_ns, points_per_ns, max_points=600,
     my_step_raw, my_step_params = step_raw(
         file_name, step_params=step_params, norm_type='max')
     t_my_step_raw = (np.arange(len(my_step_raw)) -
-                     my_step_params['step_start'])/np.float(points_per_ns)
+                     my_step_params['step_start'])/float(points_per_ns)
     my_step_width_points = step_width_ns * points_per_ns
 
     my_step_zeros = np.zeros(my_step_raw.shape)
@@ -381,7 +381,7 @@ def get_all_sampled_vector(vector, step_width_ns, points_per_ns, max_points=600,
 
     my_htilde_raw = htilde_raw(my_step_zeros, width=my_step_width_points)
     t_my_htilde_raw = (np.arange(my_step_width_points, len(
-        my_step_zeros))-my_step_params['step_start'])/np.float(points_per_ns)
+        my_step_zeros))-my_step_params['step_start'])/float(points_per_ns)
     my_step_sampled, t_my_step_sampled = step_sampled(
         file_name, step_width_ns, points_per_ns, step_params=step_params,
         norm_type=norm_type)

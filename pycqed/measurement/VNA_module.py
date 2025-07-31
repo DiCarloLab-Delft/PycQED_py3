@@ -1,6 +1,6 @@
 import numpy as np
 from pycqed.analysis import measurement_analysis as ma
-# from pycqed.analysis_v2 import measurement_analysis as ma2
+from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 
@@ -58,17 +58,26 @@ def acquire_single_linear_frequency_span(file_name, start_freq=None,
     print(str_to_write)
     VNA_instr.visa_handle.write(str_to_write)
 
-    VNA_instr.avg(nr_avg)
-    VNA_instr.number_sweeps_all(nr_avg)
+    old_soft_avg = MC_instr.soft_avg()
+    MC_instr.soft_avg(nr_avg)
+    VNA_instr.avg(1) # When using VNA averages, only the last trace is retrieved, not the averaged result. Thus, we use MC soft averages.
+    VNA_instr.number_sweeps_all(1)
     VNA_instr.average_mode(sweep_mode)
 
     VNA_instr.power(power)
     VNA_instr.timeout(10**4)
 
+    t_start = ma.a_tools.current_timestamp()
     MC_instr.run(name=file_name)
+    MC_instr.soft_avg(old_soft_avg)
+    t_stop = ma.a_tools.current_timestamp()
+    t_meas = ma.a_tools.get_timestamps_in_range(t_start, t_stop, label=file_name)
+
+    assert len(t_meas) == 1, "Multiple timestamps found for this measurement"
+    t_meas = t_meas[0]
     # ma.Homodyne_Analysis(auto=True, label=file_name, fitting_model='hanger')
-    # ma.VNA_Analysis(auto=True, label=file_name)
-    # ma2.VNA_Analysis(auto=True, label=file_name, options_dict=options_dict)
+    # ma.VNA_analysis(auto=True, label=file_name)
+    ma2.VNA_analysis(auto=True, t_start=None, options_dict=options_dict)
 
 
 

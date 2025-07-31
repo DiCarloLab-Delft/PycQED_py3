@@ -1,6 +1,7 @@
 from .base_lutman import Base_LutMan, get_wf_idx_from_name
 import numpy as np
 from copy import copy
+
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.instrument_drivers.pq_parameters import NP_NANs
@@ -13,7 +14,7 @@ except ImportError:
     pass  # This is to make the lutman work if no OpenQL is installed.
 
 import PyQt5
-from qcodes.plots.pyqtgraph import QtPlot
+from qcodes_loop.plots.pyqtgraph import QtPlot
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 import time
@@ -34,6 +35,8 @@ _def_lm = {
 
 valid_types = {'idle', 'cz', 'idle_z', 'square', 'custom'}
 
+def roundup1024(n):
+    return int(np.ceil(n / 1024) * 1024)
 
 def flux_lutmap_is_valid(lutmap: dict) -> bool:
     """
@@ -2918,7 +2921,7 @@ class HDAWG_Flux_LutMan_Adiabatic(Base_Flux_LutMan):
         sim_control_CZ_par_name = 'instr_sim_control_CZ_{}'.format(which_gate)
         sim_control_CZ_name = self.get(sim_control_CZ_par_name)
         found_name = sim_control_CZ_name is not None
-        found_instr = self._all_instruments.get(
+        found_instr = self._all_lutmans.get(
             sim_control_CZ_name) is not None
         if found_name and found_instr:
             sim_control_CZ = self.find_instrument(sim_control_CZ_name)
@@ -2972,7 +2975,7 @@ class HDAWG_Flux_LutMan_Adiabatic(Base_Flux_LutMan):
             label = 'auto_{}_{}'.format(sim_control_CZ.name, time_string)
 
         if sweep_mode == 'linear':
-            n_pnts_per_dim = np.int(np.ceil(np.sqrt(n_points)))
+            n_pnts_per_dim = int(np.ceil(np.sqrt(n_points)))
             MC.set_sweep_points(np.linspace(*theta_f_lims, n_pnts_per_dim))
             MC.set_sweep_points_2D(np.linspace(*lambda_2_lims, n_pnts_per_dim))
             MC.run(label, mode='2D')
@@ -3380,8 +3383,8 @@ def phase_corr_sine_series_half(a_i, nr_samples):
     return s
 
 
-def roundup1024(n):
-    return int(np.ceil(n/1024)*1024)
+def roundup96(n):
+    return int(np.ceil(n/96)*96)
 
 
 def sim_pars_sanity_check(station, flm, flm_static, which_gate):
@@ -3434,3 +3437,11 @@ def sim_pars_sanity_check(station, flm, flm_static, which_gate):
             log.warning(msg_str.format(par_name))
 
     return True
+
+#########################################################################
+# Convenience functions below
+#########################################################################
+
+
+def roundup1024(n):
+    return int(np.ceil(n / 1024) * 1024)

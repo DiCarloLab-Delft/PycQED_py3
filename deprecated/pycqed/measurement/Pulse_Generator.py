@@ -237,11 +237,11 @@ def T1_CBox(n_waves=70, time_step=2000, amp180=4000):
         grp = filename.create_group('Experimental Data')
 
     dataset_samples = grp.create_dataset('time', time_samples.shape,
-                                         dtype=np.float)
+                                         dtype=float)
     dataset_InputAvgRes0 = grp.create_dataset('I_raw', InputAvgRes0.shape,
-                                              dtype=np.float)
+                                              dtype=float)
     dataset_InputAvgRes1 = grp.create_dataset('Q_raw', InputAvgRes1.shape,
-                                              dtype=np.float)
+                                              dtype=float)
     dataset_samples = time_samples
     dataset_InputAvgRes0[:] = InputAvgRes0[:]
     dataset_InputAvgRes1[:] = InputAvgRes1[:]

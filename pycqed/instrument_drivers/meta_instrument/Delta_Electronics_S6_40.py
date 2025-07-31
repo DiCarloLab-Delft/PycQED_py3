@@ -1,39 +1,5 @@
-
-import time
-import logging
-import numpy as np
-# from scipy.optimize import brent
-# from math import gcd
-# from qcodes import Instrument
-from qcodes.utils import validators as vals
-# from qcodes.instrument.parameter import ManualParameter
-from pycqed.analysis import analysis_toolbox as atools
-# from pycqed.utilities.general import add_suffix_to_dict_keys
-
-from pycqed.measurement import detector_functions as det
-# from pycqed.measurement import composite_detector_functions as cdet
-# from pycqed.measurement import mc_parameter_wrapper as pw
-
-from pycqed.measurement import sweep_functions as swf
-# from pycqed.measurement import awg_sweep_functions as awg_swf
-# from pycqed.analysis import measurement_analysis as ma
-# from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_5014
-# from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_UHFQC
-# from pycqed.measurement.calibration_toolbox import mixer_skewness_calibration_5014
-# from pycqed.measurement.optimization import nelder_mead
-from pycqed.analysis import analysis_toolbox as a_tools
-# import pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts as sq
-import logging
-import numpy as np
-from copy import deepcopy,copy
-
-import qcodes as qc
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
-from qcodes.instrument.parameter import ManualParameter
-from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
-
-
 
 
 class Delta_Electronics_S6_40(Instrument):
