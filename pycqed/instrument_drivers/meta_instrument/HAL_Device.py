@@ -6460,7 +6460,7 @@ class HAL_Device(HAL_ShimMQ):
         flux_pulse_duration: float = 60e-9,
         prepare_for_timedomain: bool = True,
         disable_metadata: bool = False,
-        TLS: bool = False # added by RDC 21-07-2025
+        force_lsq_no_detuning: bool = False # added by RDC 21-07-2025
         ):
         """
         Perform 2D sweep of amplitude and wave parameter while measuring 
@@ -6499,7 +6499,7 @@ class HAL_Device(HAL_ShimMQ):
                 lm.set(f'vcz_amp_sq_{directions[i][0]}', 1)
                 lm.set(f'vcz_amp_fine_{directions[i][0]}', .5)
                 lm.set(f'vcz_amp_dac_at_11_02_{directions[i][0]}', .5)
-            if not TLS: # added by RDC 21-07-2025
+            if not force_lsq_no_detuning: # added by RDC 21-07-2025
                 for i, lm in enumerate(Flux_lm_1):
                     print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
                     lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
@@ -6709,7 +6709,7 @@ class HAL_Device(HAL_ShimMQ):
         ro_acq_averages = 2**9,
         prepare_for_timedomain: bool = True,
         disable_metadata: bool = False,
-        TLS: bool = False): # added by RDC on 21-07-2025
+        force_lsq_no_detuning: bool = False): # added by RDC on 21-07-2025
         """
         Perform 2D sweep of amplitude and wave parameter while measuring 
         conditional phase and missing fraction via the "conditional 
@@ -6747,7 +6747,7 @@ class HAL_Device(HAL_ShimMQ):
                 print(f'Setting {Q0[i]} vcz_amp_dac_at_11_02_{directions[i][0]} to 0.5')
                 lm.set(f'vcz_amp_sq_{directions[i][0]}', 1)
                 lm.set(f'vcz_amp_dac_at_11_02_{directions[i][0]}', .5)
-            if not TLS: # added by RDC on 21-07-2025
+            if not force_lsq_no_detuning: # added by RDC on 21-07-2025
                 for i, lm in enumerate(Flux_lm_1):
                     print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
                     lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
