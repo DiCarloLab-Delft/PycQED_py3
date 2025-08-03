@@ -25,6 +25,28 @@ from qcodes import Instrument
 log = logging.getLogger(__name__)
 
 
+# Helpers to override CC DIO parity generation
+def _calc_odd_parity(val: int) -> int:
+    parity = 1  # odd parity
+    while val:
+        parity ^= val & 1
+        val >>= 1
+    return parity
+
+def _dio_make_raw(desired: int, parity_mask: int) -> int:
+    """
+    Obtain a raw DIO output value by undoing the hardware DIO parity generation of the CC (since CCIO firmware version
+    0.3.2, CC software version 0.2.6.2). This works because the hardware parity generation considers ALL 32 bits
+    provided by the 'seq_out' instruction, even the bit at the location of the parity bit.
+    """
+    desired_parity = 0 if desired & parity_mask == 0 else 1
+    hw_parity = _calc_odd_parity(desired)
+    if desired_parity == hw_parity:
+        return desired
+    else:
+        return desired ^ parity_mask
+
+
 class CC(CCCore, Instrument, DIO.CalInterface):
     def __init__(self,
                  name: str,
@@ -201,6 +223,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
         if dio_mode == "awg8-mw-vsm" or dio_mode == 'microwave':  # 'new' QWG compatible microwave mode
             # based on ElecPrj_CC:src/q1asm/qwg_staircase.q1asm
             # FIXME: tests 5 of 8 bits only
+            # FIXME: not updated to cancel hardware parity generation
             cc_prog = """
             ### DIO protocol definition:
             # DIO           QWG             AWG8        note
@@ -236,12 +259,13 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
 
         elif dio_mode == "awg8-mw-direct-iq" or dio_mode == "novsm_microwave":
-            cc_prog = """
+            # FIXME: original program, remove after testing has completed
+            cc_prog_old = """
             ### DIO protocol definition:
             # DIO           QWG             AWG8        note
             # ------------- --------------- ----------- ------------------
             # DIO[31]       TRIG_2          TRIG
-            # DIO[30]       TOGGLE_DS_2     TOGGLE_DS   hardware generated
+            # DIO[30]       TOGGLE_DS_2     TOGGLE_DS   hardware generated (replaced by odd parity from CCIO firmware version 0.3.2)
             # DIO[29:23]    CW_4            CW_4
             # DIO[22:16]    CW_3            CW_3
             # DIO[15]       TRIG_1          unused
@@ -272,14 +296,61 @@ class CC(CCCore, Instrument, DIO.CalInterface):
                     loop        R1,@inner
                     jmp         @repeat
             """
+
             sequence_length = 128
             staircase_sequence = range(0, sequence_length)
             expected_sequence = [(0, list(staircase_sequence)),
                                  (1, list(staircase_sequence)),
                                  (2, list(staircase_sequence)),
                                  (3, list(staircase_sequence))]
-            dio_mask = 0x8F9F8F9F  # TRIG=0x8000000, TRIG_2=0x00008000, CWs=0x0F9F0F9F
 
+            cc_prog = """
+            ### DIO protocol definition:
+            # DIO           QWG             AWG8        note
+            # ------------- --------------- ----------- ------------------
+            # DIO[31]       TRIG_2          TRIG
+            # DIO[30]       TOGGLE_DS_2     TOGGLE_DS   hardware generated (replaced by odd parity from CCIO firmware version 0.3.2)
+            # DIO[29:23]    CW_4            CW_4
+            # DIO[22:16]    CW_3            CW_3
+            # DIO[15]       TRIG_1          unused
+            # DIO[14]       TOGGLE_DS_1     unused
+            # DIO[13:7]     CW_2            CW_2
+            # DIO[6:0]      CW_1            CW_1
+            #
+            # cw:
+            # TRIG_1    0x0000 8000
+            # TRIG_2    0x8000 0000
+
+            mainLoop:
+            """
+
+            for value in staircase_sequence:
+                dio_out = 1<<self.HDAWG_TRIG + 1<<self.QWG_TRIG_1
+                dio_out |= value  # CW_1
+                dio_out |= value<<7  # CW_2
+                dio_out |= value<<16  # CW_3
+                dio_out |= value<<23  # CW_4
+
+                dio_raw = _dio_make_raw(dio_out, 1<<self.HDAWG_TOGGLE_DS)
+
+                cc_prog += f"""
+                            seq_out         {dio_raw:x},$duration               # dio_out = 0x{dio_out:x}
+                """
+
+            cc_prog += """
+                        jmp             @mainLoop               # loop indefinitely
+            """
+
+            # FIXME: original line below is inconsistent with a sequence of 128 CWs:
+            # dio_mask = 0x8F9F8F9F  # TRIG=0x8000000, TRIG_2=0x00008000, CWs=0x0F9F0F9F
+
+            cw_mask  = 0x7F
+            dio_mask = 1<<self.HDAWG_TRIG + 1<<self.QWG_TRIG_1
+            dio_mask |= 1<<self.HDAWG_ODD_PARITY
+            dio_mask |= cw_mask  # CW_1
+            dio_mask |= cw_mask << 7  # CW_2
+            dio_mask |= cw_mask << 16  # CW_3
+            dio_mask |= cw_mask << 23  # CW_4
 
         elif dio_mode == "awg8-flux" or dio_mode == "flux":
             cc_prog = """
